@@ -1,5 +1,6 @@
 package main
 
+
 import (
 	"github.com/Orel-AI/shortener.git/api/handler"
 	"github.com/Orel-AI/shortener.git/service/shortener"
@@ -12,5 +13,3 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-}
