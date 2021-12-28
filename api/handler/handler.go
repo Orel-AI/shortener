@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"github.com/Orel-AI/shortener.git/service/shortener"
 	"io"
 	"net/http"
@@ -33,7 +32,7 @@ func (h ShortenerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 
 			w.WriteHeader(http.StatusCreated)
-			_, err = w.Write([]byte("http://localhost:8080/" + result))
+			_, err = w.Write([]byte(result))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -47,14 +46,13 @@ func (h ShortenerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "GET":
-		fmt.Println(path)
 		originalLink, err := shortener.GetOriginalLink(path)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		w.Header().Add("Location", originalLink)
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusTemporaryRedirect)
 		return
 
 	default:

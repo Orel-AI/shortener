@@ -24,23 +24,22 @@ func GetShortLink(link string) (string, error) {
 	encodedString := GenerateShortLink(link)
 
 	value, found := linkMap[encodedString]
-	if found == true && value == link {
-		return encodedString, nil
-	} else if found == true && value != link {
-		return "", errors.New("Shortener for link: " + link + " is already in DB")
+	if found && value == link {
+		return "http://localhost:8080/" + encodedString, nil
+	} else if found && value != link {
+		return "", errors.New("shortener for link: " + link + " is already in DB")
 	} else {
 		linkMap[encodedString] = link
-		return encodedString, nil
+		return "http://localhost:8080/" + encodedString, nil
 	}
 }
 
-func GetOriginalLink(linkId string) (string, error) {
-	fmt.Println(linkMap)
-	value, found := linkMap[linkId]
-	if found == true {
+func GetOriginalLink(linkID string) (string, error) {
+	value, found := linkMap[linkID]
+	if found {
 		return value, nil
 	} else {
-		return "", errors.New("No link with such LinkId")
+		return "", errors.New("no link with such LinkID")
 	}
 }
 
