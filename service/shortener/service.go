@@ -35,6 +35,7 @@ func GetShortLink(link string) (string, error) {
 }
 
 func GetOriginalLink(linkId string) (string, error) {
+	fmt.Println(linkMap)
 	value, found := linkMap[linkId]
 	if found == true {
 		return value, nil
