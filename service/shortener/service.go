@@ -30,12 +30,12 @@ func GetShortLink(link string, ctx context.Context) (string, error) {
 	}
 }
 
-func GetOriginalLink(linkId string, ctx context.Context) (string, error) {
-	value := storage.FindRecord(linkId, ctx)
+func GetOriginalLink(linkID string, ctx context.Context) (string, error) {
+	value := storage.FindRecord(linkID, ctx)
 	if value != "" {
 		return value, nil
 	} else {
-		return "", errors.New("No link with such LinkId")
+		return "", errors.New("no link with such LinkId")
 	}
 }
 

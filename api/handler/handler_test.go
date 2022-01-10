@@ -61,6 +61,7 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 			w := httptest.NewRecorder()
 			ShortenerHandler{}.ServeHTTP(w, request)
 			r := w.Result()
+			_ = r.Close
 			if tt.method == http.MethodPost {
 				body, err := io.ReadAll(r.Body)
 				if err != nil {

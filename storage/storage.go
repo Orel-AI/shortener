@@ -14,7 +14,7 @@ func AddRecord(key string, data string, ctx context.Context) {
 
 func FindRecord(key string, ctx context.Context) (res string) {
 	value, found := linkMap[key]
-	if found == true {
+	if found {
 		return value
 	} else {
 		return ""
