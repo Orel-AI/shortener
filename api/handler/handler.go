@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"github.com/Orel-AI/shortener.git/service/shortener"
 	"io"
 	"net/http"
@@ -13,23 +14,26 @@ type ShortenerHandler struct {
 
 func (h ShortenerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	switch r.Method {
 
 	case "POST":
 		if path == "" {
+			defer r.Body.Close()
 			body, err := io.ReadAll(r.Body)
-
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
-			result, err := shortener.GetShortLink(string(body))
+			result, err := shortener.GetShortLink(string(body), ctx)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
+			result = "http://localhost:8080/" + result
 
 			w.WriteHeader(http.StatusCreated)
 			_, err = w.Write([]byte(result))
@@ -46,7 +50,7 @@ func (h ShortenerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "GET":
-		originalLink, err := shortener.GetOriginalLink(path)
+		originalLink, err := shortener.GetOriginalLink(path, ctx)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
