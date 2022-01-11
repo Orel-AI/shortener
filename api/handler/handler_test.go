@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"context"
 	"github.com/Orel-AI/shortener.git/storage"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -33,8 +35,8 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 			},
 		},
 		{
-			name:   "Fail POST shortener test",
-			target: "/",
+			name:   "Fail POST shortener twest",
+			target: "http://localhost:8080",
 			method: http.MethodPost,
 			want: want{
 				code:         400,
@@ -44,7 +46,7 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 		},
 		{
 			name:   "Success GET shortener test",
-			target: "/MTA0OTY4",
+			target: "http://localhost:8080/MTA0OTY4",
 			method: http.MethodGet,
 			want: want{
 				code:         307,
@@ -57,25 +59,36 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			request := httptest.NewRequest(tt.method, tt.target, strings.NewReader(tt.want.requestLink))
-			w := httptest.NewRecorder()
-			ShortenerHandler{}.ServeHTTP(w, request)
-			r := w.Result()
-			err := r.Body.Close()
+			//rec := chi.NewRouter()
+			//rec.Get("/{ID}",LookUpOriginalLinkGET)
+			//rec.Post("/",GenerateShorterLinkPOST)
+			//err:= http.ListenAndServe(":8080", rec)
+
+			request, err := http.NewRequest(tt.method, tt.target, strings.NewReader(tt.want.requestLink))
 			if err != nil {
 				t.Fatal(err)
 			}
+			response := httptest.NewRecorder()
+			request.URL, err = url.Parse(tt.target)
+
 			if tt.method == http.MethodPost {
-				body, err := io.ReadAll(r.Body)
+				GenerateShorterLinkPOST(response, request)
+
+				body, err := io.ReadAll(response.Body)
 				if err != nil {
 					t.Fatal(err)
 				}
-				assert.Equal(t, tt.want.code, r.StatusCode)
+
+				assert.Equal(t, tt.want.code, response.Code)
 				assert.Equal(t, tt.want.responseLink, string(body))
 			}
 			if tt.method == http.MethodGet {
-				assert.Equal(t, tt.want.code, r.StatusCode)
-				assert.Equal(t, tt.want.responseLink, r.Header.Get("Location"))
+				storage.AddRecord(strings.TrimPrefix(request.URL.Path, "/"), tt.want.responseLink, context.Background())
+				LookUpOriginalLinkGET(response, request)
+				result := response.Result()
+
+				assert.Equal(t, tt.want.code, result.StatusCode)
+				assert.Equal(t, tt.want.responseLink, result.Header.Get("Location"))
 			}
 		})
 	}
