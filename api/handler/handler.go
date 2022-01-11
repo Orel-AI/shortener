@@ -38,7 +38,6 @@ func GenerateShorterLinkPOST(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	return
 }
 
 func LookUpOriginalLinkGET(w http.ResponseWriter, r *http.Request) {
@@ -59,5 +58,4 @@ func LookUpOriginalLinkGET(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Add("Location", originalLink)
 	w.WriteHeader(http.StatusTemporaryRedirect)
-	return
 }

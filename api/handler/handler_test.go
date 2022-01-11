@@ -59,17 +59,15 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			//rec := chi.NewRouter()
-			//rec.Get("/{ID}",LookUpOriginalLinkGET)
-			//rec.Post("/",GenerateShorterLinkPOST)
-			//err:= http.ListenAndServe(":8080", rec)
-
 			request, err := http.NewRequest(tt.method, tt.target, strings.NewReader(tt.want.requestLink))
 			if err != nil {
 				t.Fatal(err)
 			}
 			response := httptest.NewRecorder()
 			request.URL, err = url.Parse(tt.target)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if tt.method == http.MethodPost {
 				GenerateShorterLinkPOST(response, request)
@@ -86,6 +84,7 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 				storage.AddRecord(strings.TrimPrefix(request.URL.Path, "/"), tt.want.responseLink, context.Background())
 				LookUpOriginalLinkGET(response, request)
 				result := response.Result()
+				defer result.Body.Close()
 
 				assert.Equal(t, tt.want.code, result.StatusCode)
 				assert.Equal(t, tt.want.responseLink, result.Header.Get("Location"))
