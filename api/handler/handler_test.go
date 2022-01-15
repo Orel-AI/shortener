@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"github.com/Orel-AI/shortener.git/service/shortener"
 	"github.com/Orel-AI/shortener.git/storage"
 	"github.com/stretchr/testify/assert"
 	"io"
@@ -55,7 +56,9 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 		},
 	}
 
-	storage.Initialize()
+	store := storage.NewStorage()
+	service := shortener.NewShortenService(store)
+	shortenerHandler := NewShortenerHandler(service)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -70,7 +73,7 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 			}
 
 			if tt.method == http.MethodPost {
-				GenerateShorterLinkPOST(response, request)
+				shortenerHandler.GenerateShorterLinkPOST(response, request)
 
 				body, err := io.ReadAll(response.Body)
 				if err != nil {
@@ -81,8 +84,8 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 				assert.Equal(t, tt.want.responseLink, string(body))
 			}
 			if tt.method == http.MethodGet {
-				storage.AddRecord(strings.TrimPrefix(request.URL.Path, "/"), tt.want.responseLink, context.Background())
-				LookUpOriginalLinkGET(response, request)
+				store.AddRecord(strings.TrimPrefix(request.URL.Path, "/"), tt.want.responseLink, context.Background())
+				shortenerHandler.LookUpOriginalLinkGET(response, request)
 				result := response.Result()
 				defer result.Body.Close()
 

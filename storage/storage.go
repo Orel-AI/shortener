@@ -1,22 +1,27 @@
 package storage
 
-import "context"
+import (
+	"context"
+	"sync"
+)
 
-var linkMap map[string]string
-
-func Initialize() {
-	linkMap = make(map[string]string)
+type Storage struct {
+	LinkMap sync.Map
 }
 
-func AddRecord(key string, data string, ctx context.Context) {
-	linkMap[key] = data
+func NewStorage() *Storage {
+	return &Storage{sync.Map{}}
 }
 
-func FindRecord(key string, ctx context.Context) (res string) {
-	value, found := linkMap[key]
-	if found {
-		return value
-	} else {
-		return ""
+func (s *Storage) AddRecord(key string, data string, ctx context.Context) {
+	s.LinkMap.Store(key, data)
+}
+
+func (s *Storage) FindRecord(key string, ctx context.Context) (res string) {
+	values, ok := s.LinkMap.Load(key)
+	if ok {
+		res = values.(string)
+		return res
 	}
+	return ""
 }

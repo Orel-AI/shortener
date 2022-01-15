@@ -9,7 +9,15 @@ import (
 	"strings"
 )
 
-func GenerateShorterLinkPOST(w http.ResponseWriter, r *http.Request) {
+type ShortenerHandler struct {
+	shortener *shortener.ShortenService
+}
+
+func NewShortenerHandler(s *shortener.ShortenService) *ShortenerHandler {
+	return &ShortenerHandler{s}
+}
+
+func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -23,7 +31,7 @@ func GenerateShorterLinkPOST(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "link not provided in request's body", http.StatusBadRequest)
 		return
 	}
-	result, err := shortener.GetShortLink(string(body), ctx)
+	result, err := h.shortener.GetShortLink(string(body), ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -40,7 +48,7 @@ func GenerateShorterLinkPOST(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 }
 
-func LookUpOriginalLinkGET(w http.ResponseWriter, r *http.Request) {
+func (h *ShortenerHandler) LookUpOriginalLinkGET(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -51,7 +59,7 @@ func LookUpOriginalLinkGET(w http.ResponseWriter, r *http.Request) {
 	} else {
 		ID = strings.TrimPrefix(r.URL.Path, "/")
 	}
-	originalLink, err := shortener.GetOriginalLink(ID, ctx)
+	originalLink, err := h.shortener.GetOriginalLink(ID, ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

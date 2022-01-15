@@ -11,7 +11,15 @@ import (
 	"net/url"
 )
 
-func GetShortLink(link string, ctx context.Context) (string, error) {
+type ShortenService struct {
+	storage *storage.Storage
+}
+
+func NewShortenService(storage *storage.Storage) *ShortenService {
+	return &ShortenService{storage}
+}
+
+func (s *ShortenService) GetShortLink(link string, ctx context.Context) (string, error) {
 	_, err := url.ParseRequestURI(link)
 	if err != nil {
 		return "", errors.New(link + " is not correct URL")
@@ -19,19 +27,17 @@ func GetShortLink(link string, ctx context.Context) (string, error) {
 
 	encodedString := GenerateShortLink(link, ctx)
 
-	value := storage.FindRecord(encodedString, ctx)
+	value := s.storage.FindRecord(encodedString, ctx)
 	if value == link {
 		return encodedString, nil
-	} else if value != "" && value != link {
-		return "", errors.New("Shortener for link: " + link + " is already in DB")
 	} else {
-		storage.AddRecord(encodedString, link, ctx)
+		s.storage.AddRecord(encodedString, link, ctx)
 		return encodedString, nil
 	}
 }
 
-func GetOriginalLink(linkID string, ctx context.Context) (string, error) {
-	value := storage.FindRecord(linkID, ctx)
+func (s *ShortenService) GetOriginalLink(linkID string, ctx context.Context) (string, error) {
+	value := s.storage.FindRecord(linkID, ctx)
 	if value != "" {
 		return value, nil
 	} else {
