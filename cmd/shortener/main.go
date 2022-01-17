@@ -16,6 +16,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Get("/{ID}", shortenerHandler.LookUpOriginalLinkGET)
 	r.Post("/", shortenerHandler.GenerateShorterLinkPOST)
+	r.Post("/api/shorten", shortenerHandler.GenerateShorterLinkPOSTJson)
 	err := http.ListenAndServe(":8080", r)
 	if err != nil {
 		log.Fatal(err)
