@@ -86,18 +86,22 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 			}
 			if tt.method == http.MethodPost && tt.target == "http://localhost:8080/api/shorten" {
 				type RequestBody struct {
-					Url string `json:"url"`
+					URL string `json:"url"`
 				}
 				type ResponseBody struct {
 					Result string `json:"result"`
 				}
-				reqBody := RequestBody{Url: tt.want.requestLink}
+				reqBody := RequestBody{URL: tt.want.requestLink}
 				requestBody, err := json.Marshal(reqBody)
 				if err != nil {
 					log.Fatal(err)
 				}
 
 				request, err = http.NewRequest(tt.method, tt.target, bytes.NewBuffer(requestBody))
+				if err != nil {
+					log.Fatal(err)
+				}
+
 				request.Header.Add("Content-Type", "application/json")
 
 				shortenerHandler.GenerateShorterLinkPOSTJson(response, request)

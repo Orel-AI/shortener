@@ -21,7 +21,7 @@ func NewShortenerHandler(s *shortener.ShortenService) *ShortenerHandler {
 
 func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r *http.Request) {
 	type RequestBody struct {
-		Url string `json:"url"`
+		URL string `json:"url"`
 	}
 
 	type ResponseBody struct {
@@ -48,7 +48,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r 
 		log.Fatal(err)
 	}
 
-	result, err := h.shortener.GetShortLink(reqBody.Url, ctx)
+	result, err := h.shortener.GetShortLink(reqBody.URL, ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -56,13 +56,13 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r 
 	result = "http://localhost:8080/" + result
 
 	resBody := ResponseBody{Result: result}
-	resJson, err := json.Marshal(resBody)
+	resJSON, err := json.Marshal(resBody)
 	if err != nil {
 		panic(err)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_, err = w.Write([]byte(resJson))
+	_, err = w.Write([]byte(resJSON))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
