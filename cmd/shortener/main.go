@@ -11,21 +11,30 @@ import (
 )
 
 func main() {
-	store := storage.NewStorage()
-	service := shortener.NewShortenService(store)
-	shortenerHandler := handler.NewShortenerHandler(service)
-
 	addressToServe := os.Getenv("SERVER_ADDRESS")
 	if len(addressToServe) == 0 {
 		addressToServe = "localhost:8080"
 	}
+
+	fileStoragePath := os.Getenv("FILE_STORAGE_PATH")
+	if len(fileStoragePath) == 0 {
+		fileStoragePath = "storage.txt"
+	}
+
+	store, err := storage.NewStorage(fileStoragePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	service := shortener.NewShortenService(store)
+	shortenerHandler := handler.NewShortenerHandler(service)
 
 	r := chi.NewRouter()
 	r.Get("/{ID}", shortenerHandler.LookUpOriginalLinkGET)
 	r.Post("/", shortenerHandler.GenerateShorterLinkPOST)
 	r.Post("/api/shorten", shortenerHandler.GenerateShorterLinkPOSTJson)
 
-	err := http.ListenAndServe(addressToServe, r)
+	err = http.ListenAndServe(addressToServe, r)
 	if err != nil {
 		log.Fatal(err)
 	}
