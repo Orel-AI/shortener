@@ -69,7 +69,10 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 		},
 	}
 
-	store := storage.NewStorage()
+	store, err := storage.NewStorage("testStorage.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
 	service := shortener.NewShortenService(store)
 	shortenerHandler := NewShortenerHandler(service)
 

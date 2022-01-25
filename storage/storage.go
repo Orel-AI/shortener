@@ -33,10 +33,10 @@ func (s *Storage) AddRecord(key string, data string, ctx context.Context) {
 
 func (s *Storage) FindRecord(key string, ctx context.Context) (res string) {
 	fileToRead, err := os.OpenFile(s.fileName, os.O_RDONLY, 0777)
-	defer fileToRead.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer fileToRead.Close()
 
 	scanner := bufio.NewScanner(fileToRead)
 	for scanner.Scan() {
