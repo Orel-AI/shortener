@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -89,7 +90,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *htt
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	result = "http://localhost:8080/" + result
+	result = os.Getenv("BASE_URL") + result
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)

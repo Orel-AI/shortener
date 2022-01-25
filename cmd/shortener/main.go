@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"log"
 	"net/http"
+	"os"
 )
 
 func main() {
@@ -17,7 +18,8 @@ func main() {
 	r.Get("/{ID}", shortenerHandler.LookUpOriginalLinkGET)
 	r.Post("/", shortenerHandler.GenerateShorterLinkPOST)
 	r.Post("/api/shorten", shortenerHandler.GenerateShorterLinkPOSTJson)
-	err := http.ListenAndServe(":8080", r)
+
+	err := http.ListenAndServe(os.Getenv("SERVER_ADDRESS"), r)
 	if err != nil {
 		log.Fatal(err)
 	}
