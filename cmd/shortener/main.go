@@ -14,12 +14,18 @@ func main() {
 	store := storage.NewStorage()
 	service := shortener.NewShortenService(store)
 	shortenerHandler := handler.NewShortenerHandler(service)
+
+	addressToServe := os.Getenv("SERVER_ADDRESS")
+	if len(addressToServe) == 0 {
+		addressToServe = "localhost:8080"
+	}
+
 	r := chi.NewRouter()
 	r.Get("/{ID}", shortenerHandler.LookUpOriginalLinkGET)
 	r.Post("/", shortenerHandler.GenerateShorterLinkPOST)
 	r.Post("/api/shorten", shortenerHandler.GenerateShorterLinkPOSTJson)
 
-	err := http.ListenAndServe(os.Getenv("SERVER_ADDRESS"), r)
+	err := http.ListenAndServe(addressToServe, r)
 	if err != nil {
 		log.Fatal(err)
 	}
