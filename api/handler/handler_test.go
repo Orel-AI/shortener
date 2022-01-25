@@ -74,7 +74,7 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 		log.Fatal(err)
 	}
 	service := shortener.NewShortenService(store)
-	shortenerHandler := NewShortenerHandler(service)
+	shortenerHandler := NewShortenerHandler(service, "http://localhost:8080/")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -54,7 +54,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r 
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	result = h.baseURL + result
+	result = h.baseURL + "/" + result
 
 	resBody := ResponseBody{Result: result}
 	resJSON, err := json.Marshal(resBody)
@@ -90,7 +90,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *htt
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	result = h.baseURL + result
+	result = h.baseURL + "/" + result
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)

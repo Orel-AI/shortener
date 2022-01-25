@@ -34,7 +34,7 @@ func main() {
 	}
 
 	if len(envs.baseURL) == 0 {
-		envs.baseURL = "http://localhost:8080/"
+		envs.baseURL = "http://localhost:8080"
 	}
 
 	store, err := storage.NewStorage(envs.fileStoragePath)
