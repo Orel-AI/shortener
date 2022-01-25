@@ -8,16 +8,16 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 )
 
 type ShortenerHandler struct {
 	shortener *shortener.ShortenService
+	baseURL   string
 }
 
-func NewShortenerHandler(s *shortener.ShortenService) *ShortenerHandler {
-	return &ShortenerHandler{s}
+func NewShortenerHandler(s *shortener.ShortenService, b string) *ShortenerHandler {
+	return &ShortenerHandler{s, b}
 }
 
 func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +54,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r 
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	result = MakeResultURL(result)
+	result = h.baseURL + result
 
 	resBody := ResponseBody{Result: result}
 	resJSON, err := json.Marshal(resBody)
@@ -90,7 +90,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *htt
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	result = MakeResultURL(result)
+	result = h.baseURL + result
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
@@ -119,14 +119,4 @@ func (h *ShortenerHandler) LookUpOriginalLinkGET(w http.ResponseWriter, r *http.
 	}
 	w.Header().Add("Location", originalLink)
 	w.WriteHeader(http.StatusTemporaryRedirect)
-}
-
-func MakeResultURL(s string) string {
-	baseURL := os.Getenv("BASE_URL")
-	if len(baseURL) == 0 {
-		baseURL = "http://localhost:8080/"
-	} else {
-		baseURL = baseURL + "/"
-	}
-	return baseURL + s
 }
