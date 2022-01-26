@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/Orel-AI/shortener.git/service/shortener"
 	"github.com/go-chi/chi/v5"
 	"io"
@@ -15,20 +16,19 @@ type ShortenerHandler struct {
 	shortener *shortener.ShortenService
 	baseURL   string
 }
+type RequestBody struct {
+	URL string `json:"url"`
+}
+
+type ResponseBody struct {
+	Result string `json:"result"`
+}
 
 func NewShortenerHandler(s *shortener.ShortenService, b string) *ShortenerHandler {
 	return &ShortenerHandler{s, b}
 }
 
 func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r *http.Request) {
-	type RequestBody struct {
-		URL string `json:"url"`
-	}
-
-	type ResponseBody struct {
-		Result string `json:"result"`
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -54,7 +54,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r 
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	result = h.baseURL + "/" + result
+	result = fmt.Sprintf("%v/%v", h.baseURL, result)
 
 	resBody := ResponseBody{Result: result}
 	resJSON, err := json.Marshal(resBody)
@@ -90,7 +90,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *htt
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	result = h.baseURL + "/" + result
+	result = fmt.Sprintf("%v/%v", h.baseURL, result)
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)

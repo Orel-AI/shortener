@@ -39,7 +39,7 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 			},
 		},
 		{
-			name:   "Fail POST shortener twest",
+			name:   "Fail POST shortener test",
 			target: "http://localhost:8080",
 			method: http.MethodPost,
 			want: want{
