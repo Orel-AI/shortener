@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/Orel-AI/shortener.git/api/handler"
+	"github.com/Orel-AI/shortener.git/config"
 	"github.com/Orel-AI/shortener.git/service/shortener"
 	"github.com/Orel-AI/shortener.git/storage"
 	"github.com/go-chi/chi/v5"
@@ -10,13 +11,22 @@ import (
 )
 
 func main() {
-	store := storage.NewStorage()
+
+	envs := config.NewConfig()
+	store, err := storage.NewStorage(envs.FileStoragePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	service := shortener.NewShortenService(store)
-	shortenerHandler := handler.NewShortenerHandler(service)
+	shortenerHandler := handler.NewShortenerHandler(service, envs.BaseURL)
+
 	r := chi.NewRouter()
 	r.Get("/{ID}", shortenerHandler.LookUpOriginalLinkGET)
 	r.Post("/", shortenerHandler.GenerateShorterLinkPOST)
-	err := http.ListenAndServe(":8080", r)
+	r.Post("/api/shorten", shortenerHandler.GenerateShorterLinkPOSTJson)
+
+	err = http.ListenAndServe(envs.AddressToServe, r)
 	if err != nil {
 		log.Fatal(err)
 	}

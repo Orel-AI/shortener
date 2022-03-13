@@ -2,19 +2,73 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"github.com/Orel-AI/shortener.git/service/shortener"
 	"github.com/go-chi/chi/v5"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 )
 
 type ShortenerHandler struct {
 	shortener *shortener.ShortenService
+	baseURL   string
+}
+type RequestBody struct {
+	URL string `json:"url"`
 }
 
-func NewShortenerHandler(s *shortener.ShortenService) *ShortenerHandler {
-	return &ShortenerHandler{s}
+type ResponseBody struct {
+	Result string `json:"result"`
+}
+
+func NewShortenerHandler(s *shortener.ShortenService, b string) *ShortenerHandler {
+	return &ShortenerHandler{s, b}
+}
+
+func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	body, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		return
+	}
+
+	reqBody := RequestBody{}
+
+	err = json.Unmarshal(body, &reqBody)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	result, err := h.shortener.GetShortLink(reqBody.URL, ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	result = fmt.Sprintf("%v/%v", h.baseURL, result)
+
+	resBody := ResponseBody{Result: result}
+	resJSON, err := json.Marshal(resBody)
+	if err != nil {
+		panic(err)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_, err = w.Write([]byte(resJSON))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 }
 
 func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *http.Request) {
@@ -36,16 +90,15 @@ func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *htt
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	result = "http://localhost:8080/" + result
+	result = fmt.Sprintf("%v/%v", h.baseURL, result)
 
+	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(result))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	w.Header().Set("Content-Type", "text/plain")
 }
 
 func (h *ShortenerHandler) LookUpOriginalLinkGET(w http.ResponseWriter, r *http.Request) {

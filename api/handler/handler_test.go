@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"github.com/Orel-AI/shortener.git/service/shortener"
 	"github.com/Orel-AI/shortener.git/storage"
 	"github.com/stretchr/testify/assert"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -36,7 +39,7 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 			},
 		},
 		{
-			name:   "Fail POST shortener twest",
+			name:   "Fail POST shortener test",
 			target: "http://localhost:8080",
 			method: http.MethodPost,
 			want: want{
@@ -54,11 +57,24 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 				responseLink: "https://ya.ru",
 			},
 		},
+		{
+			name:   "Success POST Json shortener test",
+			target: "http://localhost:8080/api/shorten",
+			method: http.MethodPost,
+			want: want{
+				code:         201,
+				requestLink:  "https://ya.ru",
+				responseLink: "http://localhost:8080/MTA0OTY4",
+			},
+		},
 	}
 
-	store := storage.NewStorage()
+	store, err := storage.NewStorage("testStorage.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
 	service := shortener.NewShortenService(store)
-	shortenerHandler := NewShortenerHandler(service)
+	shortenerHandler := NewShortenerHandler(service, "http://localhost:8080")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -71,8 +87,43 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if tt.method == http.MethodPost && tt.target == "http://localhost:8080/api/shorten" {
+				type RequestBody struct {
+					URL string `json:"url"`
+				}
+				type ResponseBody struct {
+					Result string `json:"result"`
+				}
+				reqBody := RequestBody{URL: tt.want.requestLink}
+				requestBody, err := json.Marshal(reqBody)
+				if err != nil {
+					log.Fatal(err)
+				}
 
-			if tt.method == http.MethodPost {
+				request, err = http.NewRequest(tt.method, tt.target, bytes.NewBuffer(requestBody))
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				request.Header.Add("Content-Type", "application/json")
+
+				shortenerHandler.GenerateShorterLinkPOSTJson(response, request)
+
+				body, err := io.ReadAll(response.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				resBody := ResponseBody{}
+				err = json.Unmarshal(body, &resBody)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				assert.Equal(t, tt.want.code, response.Code)
+				assert.Equal(t, tt.want.responseLink, resBody.Result)
+
+			} else if tt.method == http.MethodPost {
 				shortenerHandler.GenerateShorterLinkPOST(response, request)
 
 				body, err := io.ReadAll(response.Body)

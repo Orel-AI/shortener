@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"log"
 	"testing"
 )
 
@@ -26,7 +27,10 @@ func TestFindRecord(t *testing.T) {
 			wantRes: "someData",
 		},
 	}
-	storage := NewStorage()
+	storage, err := NewStorage("testStorage.txt")
+	if err != nil {
+		log.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			storage.AddRecord(tt.args.key, tt.args.data, tt.args.ctx)
