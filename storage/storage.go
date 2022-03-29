@@ -98,7 +98,7 @@ func (s *Storage) FindAllUsersRecords(key string, baseURL string, ctx context.Co
 		if strings.Contains(scanner.Text(), key) {
 			line := scanner.Text()
 			results[line[strings.Index(line, "|")+1:strings.LastIndex(line, "|")]] =
-				baseURL + line[:strings.Index(line, "|")]
+				baseURL + "/" + line[:strings.Index(line, "|")]
 		}
 	}
 	return results
