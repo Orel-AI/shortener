@@ -88,7 +88,6 @@ func (h *ShortenerHandler) AuthMiddlewareHandler(next http.Handler) http.Handler
 			}
 			http.SetCookie(w, cookie)
 		}
-		log.Println(id)
 		ctx := context.WithValue(r.Context(), "UserID", id)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -263,13 +262,11 @@ func (h *ShortenerHandler) LookUpUsersRequest(w http.ResponseWriter, r *http.Req
 
 func (h *ShortenerHandler) PingDBByRequest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	log.Println("ya tut")
 	err := h.Shortener.Storage.PingDB(ctx)
-
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	log.Println("ya tut 2")
+
 	w.WriteHeader(http.StatusOK)
 	return
 }
