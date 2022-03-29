@@ -12,7 +12,7 @@ import (
 )
 
 type ShortenService struct {
-	storage *storage.Storage
+	Storage *storage.Storage
 }
 
 func NewShortenService(storage *storage.Storage) *ShortenService {
@@ -27,17 +27,17 @@ func (s *ShortenService) GetShortLink(link string, ctx context.Context) (string,
 
 	encodedString := GenerateShortLink(link, ctx)
 
-	value := s.storage.FindRecordWithUserID(encodedString, ctx)
+	value := s.Storage.FindRecordWithUserID(encodedString, ctx)
 	if value == link {
 		return encodedString, nil
 	} else {
-		s.storage.AddRecord(encodedString, link, ctx)
+		s.Storage.AddRecord(encodedString, link, ctx)
 		return encodedString, nil
 	}
 }
 
 func (s *ShortenService) GetOriginalLink(linkID string, ctx context.Context) (string, error) {
-	value := s.storage.FindRecord(linkID, ctx)
+	value := s.Storage.FindRecord(linkID, ctx)
 	if value != "" {
 		return value, nil
 	} else {
@@ -46,7 +46,7 @@ func (s *ShortenService) GetOriginalLink(linkID string, ctx context.Context) (st
 }
 
 func (s *ShortenService) GetUsersLinks(UserID string, baseURL string, ctx context.Context) (map[string]string, error) {
-	res := s.storage.FindAllUsersRecords(UserID, baseURL, ctx)
+	res := s.Storage.FindAllUsersRecords(UserID, baseURL, ctx)
 	if len(res) != 0 {
 		return res, nil
 	} else {

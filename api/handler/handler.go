@@ -20,7 +20,7 @@ import (
 )
 
 type ShortenerHandler struct {
-	shortener    *shortener.ShortenService
+	Shortener    *shortener.ShortenService
 	baseURL      string
 	secretString string
 	cookieName   string
@@ -160,7 +160,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r 
 	}
 
 	log.Println(reqBody.URL)
-	result, err := h.shortener.GetShortLink(reqBody.URL, ctx)
+	result, err := h.Shortener.GetShortLink(reqBody.URL, ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -194,7 +194,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *htt
 		http.Error(w, "link not provided in request's body", http.StatusBadRequest)
 		return
 	}
-	result, err := h.shortener.GetShortLink(string(body), ctx)
+	result, err := h.Shortener.GetShortLink(string(body), ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -221,7 +221,7 @@ func (h *ShortenerHandler) LookUpOriginalLinkGET(w http.ResponseWriter, r *http.
 	} else {
 		ID = strings.TrimPrefix(r.URL.Path, "/")
 	}
-	originalLink, err := h.shortener.GetOriginalLink(ID, ctx)
+	originalLink, err := h.Shortener.GetOriginalLink(ID, ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -235,7 +235,7 @@ func (h *ShortenerHandler) LookUpUsersRequest(w http.ResponseWriter, r *http.Req
 	userId := ctx.Value("UserID").(uint64)
 	UserID := strconv.FormatUint(userId, 10)
 
-	searchResult, err := h.shortener.GetUsersLinks(UserID, h.baseURL, ctx)
+	searchResult, err := h.Shortener.GetUsersLinks(UserID, h.baseURL, ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNoContent)
 		return
@@ -258,4 +258,18 @@ func (h *ShortenerHandler) LookUpUsersRequest(w http.ResponseWriter, r *http.Req
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+}
+
+func (h *ShortenerHandler) PingDBByRequest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	log.Println("ya tut")
+	err := h.Shortener.Storage.PingDB(ctx)
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	log.Println("ya tut 2")
+	w.WriteHeader(http.StatusOK)
+	return
 }

@@ -3,6 +3,8 @@ package storage
 import (
 	"bufio"
 	"context"
+	"fmt"
+	"github.com/jackc/pgx"
 	"log"
 	"os"
 	"strconv"
@@ -13,18 +15,50 @@ type Storage struct {
 	file     *os.File
 	writer   *bufio.Writer
 	fileName string
+	Database DatabaseInstance
+}
+type DatabaseInstance struct {
+	conn       *pgx.Conn
+	connConfig pgx.ConnConfig
 }
 
-func NewStorage(filename string) (*Storage, error) {
+func NewStorage(filename string, dsnString string) (*Storage, error) {
+	parseRes, err := pgx.ParseDSN(dsnString)
+	if err != nil {
+		log.Fatalf("Unable to parse DSN string: %v\n", err)
+	}
+	conn, err := pgx.Connect(parseRes)
+	if err != nil {
+		log.Fatalf("Unable to connection to database: %v\n", err)
+	}
+	defer conn.Close()
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Storage{
 		file:     file,
 		writer:   bufio.NewWriter(file),
 		fileName: filename,
+		Database: DatabaseInstance{
+			conn:       conn,
+			connConfig: parseRes,
+		},
 	}, nil
+}
+
+func (db *DatabaseInstance) reconnect() (*pgx.Conn, error) {
+	conn, err := pgx.Connect(db.connConfig)
+	if err != nil {
+		return nil, fmt.Errorf("unable to connection to database: %v", err)
+	}
+
+	if err = conn.Ping(context.Background()); err != nil {
+		return nil, fmt.Errorf("couldn't ping postgre database: %v", err)
+	}
+
+	return conn, err
 }
 
 func (s *Storage) AddRecord(key string, data string, ctx context.Context) {
@@ -102,4 +136,10 @@ func (s *Storage) FindAllUsersRecords(key string, baseURL string, ctx context.Co
 		}
 	}
 	return results
+}
+
+func (s *Storage) PingDB(ctx context.Context) error {
+	conn, err := s.Database.reconnect()
+	defer conn.Close()
+	return err
 }
