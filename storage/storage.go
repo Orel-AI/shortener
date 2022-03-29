@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Storage struct {
@@ -24,6 +25,14 @@ type DatabaseInstance struct {
 
 func NewStorage(filename string, dsnString string) (*Storage, error) {
 	var database = DatabaseInstance{}
+	parseRes, err := pgx.ParseDSN(dsnString)
+
+	if err == nil && len(dsnString) > 0 {
+		database = DatabaseInstance{
+			connConfig: parseRes,
+		}
+		database.GetConn()
+	}
 
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
@@ -38,10 +47,44 @@ func NewStorage(filename string, dsnString string) (*Storage, error) {
 	}, nil
 }
 
+func (db *DatabaseInstance) GetConn() *pgx.Conn {
+	var err error
+
+	if db.conn == nil {
+		if db.conn, err = db.reconnect(); err != nil {
+			log.Fatalf("%s", err)
+		}
+	}
+
+	if err = db.conn.Ping(context.Background()); err != nil {
+		attempt := 0
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			if attempt >= 1 {
+				log.Printf("connection failed after %d attempt\n", attempt)
+			}
+			attempt++
+
+			log.Println("reconnecting...")
+
+			db.conn, err = db.reconnect()
+			if err == nil {
+				return db.conn
+			}
+
+			log.Printf("connection was lost. Error: %s. Waiting for 5 sec...\n", err)
+		}
+	}
+
+	return db.conn
+}
+
 func (db *DatabaseInstance) reconnect() (*pgx.Conn, error) {
 	conn, err := pgx.Connect(db.connConfig)
 	if err != nil {
-		return nil, fmt.Errorf("unable to connection to database: %v", err)
+		return nil, fmt.Errorf("unable to connection to database1: %v", err)
 	}
 
 	if err = conn.Ping(context.Background()); err != nil {
