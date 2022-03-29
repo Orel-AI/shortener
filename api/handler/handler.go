@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -22,6 +23,31 @@ type RequestBody struct {
 
 type ResponseBody struct {
 	Result string `json:"result"`
+}
+
+type gzipWriter struct {
+	http.ResponseWriter
+	Writer io.Writer
+}
+
+func (w gzipWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
+}
+func (h *ShortenerHandler) GzipHandle(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		gz, err := gzip.NewWriterLevel(w, gzip.DefaultCompression)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		defer gz.Close()
+		w.Header().Set("Content-Encoding", "gzip")
+		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
+	})
 }
 
 func NewShortenerHandler(s *shortener.ShortenService, b string) *ShortenerHandler {
