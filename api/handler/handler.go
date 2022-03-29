@@ -170,7 +170,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r 
 	}
 
 	log.Println(reqBody.URL)
-	result, err := h.Shortener.GetShortLink(reqBody.URL, ctx)
+	result, isExisted, err := h.Shortener.GetShortLink(reqBody.URL, ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -183,7 +183,11 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r 
 		panic(err)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	if isExisted {
+		w.WriteHeader(http.StatusConflict)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
 	_, err = w.Write([]byte(resJSON))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -204,7 +208,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *htt
 		http.Error(w, "link not provided in request's body", http.StatusBadRequest)
 		return
 	}
-	result, err := h.Shortener.GetShortLink(string(body), ctx)
+	result, isExisted, err := h.Shortener.GetShortLink(string(body), ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -212,7 +216,11 @@ func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *htt
 	result = fmt.Sprintf("%v/%v", h.baseURL, result)
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusCreated)
+	if isExisted {
+		w.WriteHeader(http.StatusConflict)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
 	_, err = w.Write([]byte(result))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -305,7 +313,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTBatch(w http.ResponseWriter, r
 	}
 
 	for i := 0; i < len(reqBody); i++ {
-		result, err := h.Shortener.GetShortLink(reqBody[i].OriginalURL, ctx)
+		result, _, err := h.Shortener.GetShortLink(reqBody[i].OriginalURL, ctx)
 		if err != nil {
 			continue
 		}

@@ -172,7 +172,8 @@ func (db *DatabaseInstance) FindRecord(key string, ctx context.Context) (res str
 	defer conn.Close(ctx)
 	var result string
 
-	err = conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener WHERE short_url  = $1;", key).Scan(&result)
+	err = conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
+		"WHERE short_url  = $1;", key).Scan(&result)
 	return result
 }
 
@@ -186,7 +187,8 @@ func (db *DatabaseInstance) FindRecordWithUserID(key string, ctx context.Context
 	userId := ctx.Value("UserID").(uint64)
 	userIdStr := strconv.FormatUint(userId, 10)
 
-	conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener WHERE short_url  = $1 and user_id = $2;", key, userIdStr).Scan(&result)
+	conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
+		"WHERE short_url  = $1 and user_id = $2;", key, userIdStr).Scan(&result)
 	return result
 
 }
@@ -201,11 +203,11 @@ func (db *DatabaseInstance) AddRecord(key string, data string, ctx context.Conte
 	}
 	defer conn.Close(ctx)
 
-	_, err = conn.Exec(ctx, "INSERT INTO shortener.shortener (original_url, short_url, user_id) VALUES ($1, $2, $3);", data, key, userIdStr)
+	_, err = conn.Exec(ctx, "INSERT INTO shortener.shortener "+
+		"(original_url, short_url, user_id) VALUES ($1, $2, $3);", data, key, userIdStr)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	return
 }
 
@@ -222,7 +224,8 @@ func (db *DatabaseInstance) FindAllUsersRecords(key string, baseURL string, ctx 
 	}
 	defer conn.Close(ctx)
 
-	rows, err := conn.Query(ctx, "SELECT short_url, original_url FROM shortener.shortener WHERE user_id = $1", userIdStr)
+	rows, err := conn.Query(ctx, "SELECT short_url, original_url "+
+		"FROM shortener.shortener WHERE user_id = $1", userIdStr)
 
 	for rows.Next() {
 		err := rows.Scan(&trimShorten, &originalURL)
@@ -247,7 +250,8 @@ func (db *DatabaseInstance) checkExist() {
 	}
 	err = conn.QueryRow(context.Background(), "SELECT COUNT(*) FROM shortener.shortener;").Scan(&cnt)
 	if err != nil {
-		_, err = conn.Exec(context.Background(), "CREATE TABLE shortener.shortener (user_id VARCHAR(256), short_url VARCHAR(256), original_url VARCHAR(256));")
+		_, err = conn.Exec(context.Background(), "CREATE TABLE shortener.shortener (user_id VARCHAR(256),"+
+			" short_url VARCHAR(256), original_url VARCHAR(256) PRIMARY KEY );")
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -19,20 +19,20 @@ func NewShortenService(storage storage.Storage) *ShortenService {
 	return &ShortenService{storage}
 }
 
-func (s *ShortenService) GetShortLink(link string, ctx context.Context) (string, error) {
+func (s *ShortenService) GetShortLink(link string, ctx context.Context) (string, bool, error) {
 	_, err := url.ParseRequestURI(link)
 	if err != nil {
-		return "", errors.New(link + " is not correct URL")
+		return "", false, errors.New(link + " is not correct URL")
 	}
 
 	encodedString := GenerateShortLink(link, ctx)
 
-	value := s.Storage.FindRecordWithUserID(encodedString, ctx)
+	value := s.Storage.FindRecord(encodedString, ctx)
 	if value == link {
-		return encodedString, nil
+		return encodedString, true, nil
 	} else {
 		s.Storage.AddRecord(encodedString, link, ctx)
-		return encodedString, nil
+		return encodedString, false, nil
 	}
 }
 
