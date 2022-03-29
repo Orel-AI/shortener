@@ -38,6 +38,17 @@ type MapOriginalShorten struct {
 	OriginalURL string `json:"original_url"`
 	ShortURL    string `json:"short_url"`
 }
+
+type BatchRq struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+type BatchRs struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}
+
 type gzipWriter struct {
 	http.ResponseWriter
 	Writer io.Writer
@@ -269,4 +280,52 @@ func (h *ShortenerHandler) PingDBByRequest(w http.ResponseWriter, r *http.Reques
 
 	w.WriteHeader(http.StatusOK)
 	return
+}
+
+func (h *ShortenerHandler) GenerateShorterLinkPOSTBatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	body, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "Content-Type header is not valid", http.StatusBadRequest)
+		return
+	}
+
+	var reqBody []BatchRq
+	var resBody []BatchRs
+
+	err = json.Unmarshal(body, &reqBody)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for i := 0; i < len(reqBody); i++ {
+		result, err := h.Shortener.GetShortLink(reqBody[i].OriginalURL, ctx)
+		if err != nil {
+			continue
+		}
+		result = fmt.Sprintf("%v/%v", h.baseURL, result)
+		resBody = append(resBody, BatchRs{
+			CorrelationID: reqBody[i].CorrelationID,
+			ShortURL:      result,
+		})
+
+	}
+
+	resJSON, err := json.Marshal(resBody)
+	if err != nil {
+		panic(err)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_, err = w.Write([]byte(resJSON))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 }

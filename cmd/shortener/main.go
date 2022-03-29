@@ -29,6 +29,7 @@ func main() {
 	r.Get("/ping", shortenerHandler.PingDBByRequest)
 	r.Post("/", shortenerHandler.GenerateShorterLinkPOST)
 	r.Post("/api/shorten", shortenerHandler.GenerateShorterLinkPOSTJson)
+	r.Post("/api/shorten/batch", shortenerHandler.GenerateShorterLinkPOSTBatch)
 
 	err = http.ListenAndServe(envs.AddressToServe, r)
 	if err != nil {
