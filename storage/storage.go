@@ -24,21 +24,6 @@ type DatabaseInstance struct {
 
 func NewStorage(filename string, dsnString string) (*Storage, error) {
 	var database = DatabaseInstance{}
-	if len(dsnString) != 0 {
-		parseRes, err := pgx.ParseDSN(dsnString)
-		if err != nil {
-			log.Fatalf("Unable to parse DSN string: %v\n", err)
-		}
-		conn, err := pgx.Connect(parseRes)
-		if err != nil {
-			log.Fatalf("Unable to connection to database: %v\n", err)
-		}
-		defer conn.Close()
-		database = DatabaseInstance{
-			conn:       conn,
-			connConfig: parseRes,
-		}
-	}
 
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
