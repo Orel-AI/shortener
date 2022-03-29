@@ -31,8 +31,7 @@ type RequestBody struct {
 }
 
 type ResponseBody struct {
-	Result  string `json:"result"`
-	PairURL []MapOriginalShorten
+	Result string `json:"result"`
 }
 
 type MapOriginalShorten struct {
@@ -140,8 +139,7 @@ func NewShortenerHandler(s *shortener.ShortenService, b string, secretString str
 }
 
 func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := r.Context()
 
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
@@ -150,6 +148,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r 
 		return
 	}
 	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "Content-Type header is not valid", http.StatusBadRequest)
 		return
 	}
 
@@ -160,6 +159,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r 
 		log.Fatal(err)
 	}
 
+	log.Println(reqBody.URL)
 	result, err := h.shortener.GetShortLink(reqBody.URL, ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
