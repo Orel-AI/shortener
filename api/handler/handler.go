@@ -3,6 +3,11 @@ package handler
 import (
 	"compress/gzip"
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/Orel-AI/shortener.git/service/shortener"
@@ -10,21 +15,30 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
 type ShortenerHandler struct {
-	shortener *shortener.ShortenService
-	baseURL   string
+	shortener    *shortener.ShortenService
+	baseURL      string
+	secretString string
+	cookieName   string
 }
+
 type RequestBody struct {
 	URL string `json:"url"`
 }
 
 type ResponseBody struct {
-	Result string `json:"result"`
+	Result  string `json:"result"`
+	PairURL []MapOriginalShorten
 }
 
+type MapOriginalShorten struct {
+	OriginalURL string `json:"original_url"`
+	ShortURL    string `json:"short_url"`
+}
 type gzipWriter struct {
 	http.ResponseWriter
 	Writer io.Writer
@@ -36,31 +50,93 @@ func (w gzipWriter) Write(b []byte) (int, error) {
 func (h *ShortenerHandler) GzipHandle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
-			gzr, err := gzip.NewReader(r.Body)
+			gzippedOutput, err := gzip.NewReader(r.Body)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			r.Body = gzr
+			r.Body = gzippedOutput
 		}
 
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			next.ServeHTTP(w, r)
 			return
 		}
-		gzw, err := gzip.NewWriterLevel(w, gzip.DefaultCompression)
+		gzipW, err := gzip.NewWriterLevel(w, gzip.DefaultCompression)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		defer gzw.Close()
+		defer gzipW.Close()
 		w.Header().Set("Content-Encoding", "gzip")
-		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gzw}, r)
+		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gzipW}, r)
 	})
 }
 
-func NewShortenerHandler(s *shortener.ShortenService, b string) *ShortenerHandler {
-	return &ShortenerHandler{s, b}
+func (h *ShortenerHandler) AuthMiddlewareHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(h.cookieName)
+		if err != nil && err != http.ErrNoCookie {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		id, err := h.decodeAuthCookie(cookie)
+		if err != nil {
+			cookie, id, err = h.generateAuthCookie()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			http.SetCookie(w, cookie)
+		}
+		log.Println(id)
+		ctx := context.WithValue(r.Context(), "UserID", id)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+func (h *ShortenerHandler) decodeAuthCookie(cookie *http.Cookie) (uint64, error) {
+	if cookie == nil {
+		return 0, http.ErrNoCookie
+	}
+
+	data, err := hex.DecodeString(cookie.Value)
+	if err != nil {
+		return 0, err
+	}
+
+	id := binary.BigEndian.Uint64(data[:8])
+
+	hm := hmac.New(sha256.New, []byte(h.secretString))
+	hm.Write(data[:8])
+	sign := hm.Sum(nil)
+	if hmac.Equal(data[8:], sign) {
+		return id, nil
+	}
+	return 0, http.ErrNoCookie
+}
+
+func (h *ShortenerHandler) generateAuthCookie() (*http.Cookie, uint64, error) {
+	id := make([]byte, 8)
+
+	_, err := rand.Read(id)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	hm := hmac.New(sha256.New, []byte(h.secretString))
+	hm.Write(id)
+	sign := hex.EncodeToString(append(id, hm.Sum(nil)...))
+
+	return &http.Cookie{
+			Name:  h.cookieName,
+			Value: sign,
+		},
+		binary.BigEndian.Uint64(id),
+		nil
+}
+
+func NewShortenerHandler(s *shortener.ShortenService, b string, secretString string, cookieName string) *ShortenerHandler {
+	return &ShortenerHandler{s, b, secretString, cookieName}
 }
 
 func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r *http.Request) {
@@ -107,9 +183,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r 
 }
 
 func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
+	ctx := r.Context()
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
@@ -154,4 +228,34 @@ func (h *ShortenerHandler) LookUpOriginalLinkGET(w http.ResponseWriter, r *http.
 	}
 	w.Header().Add("Location", originalLink)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (h *ShortenerHandler) LookUpUsersRequest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userId := ctx.Value("UserID").(uint64)
+	UserID := strconv.FormatUint(userId, 10)
+
+	searchResult, err := h.shortener.GetUsersLinks(UserID, h.baseURL, ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNoContent)
+		return
+	}
+
+	var response []MapOriginalShorten
+	for key, value := range searchResult {
+		response = append(response,
+			MapOriginalShorten{OriginalURL: key, ShortURL: value})
+	}
+
+	resJSON, err := json.Marshal(response)
+	if err != nil {
+		panic(err)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write([]byte(resJSON))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 }

@@ -19,11 +19,13 @@ func main() {
 	}
 
 	service := shortener.NewShortenService(store)
-	shortenerHandler := handler.NewShortenerHandler(service, envs.BaseURL)
+	shortenerHandler := handler.NewShortenerHandler(service, envs.BaseURL, "secret", "shrtCookie")
 
 	r := chi.NewRouter()
 	r.Use(shortenerHandler.GzipHandle)
+	r.Use(shortenerHandler.AuthMiddlewareHandler)
 	r.Get("/{ID}", shortenerHandler.LookUpOriginalLinkGET)
+	r.Get("/api/user/urls", shortenerHandler.LookUpUsersRequest)
 	r.Post("/", shortenerHandler.GenerateShorterLinkPOST)
 	r.Post("/api/shorten", shortenerHandler.GenerateShorterLinkPOSTJson)
 
@@ -31,8 +33,4 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-func selectRoute() {
-
 }

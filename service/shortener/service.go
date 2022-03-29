@@ -27,7 +27,7 @@ func (s *ShortenService) GetShortLink(link string, ctx context.Context) (string,
 
 	encodedString := GenerateShortLink(link, ctx)
 
-	value := s.storage.FindRecord(encodedString, ctx)
+	value := s.storage.FindRecordWithUserID(encodedString, ctx)
 	if value == link {
 		return encodedString, nil
 	} else {
@@ -42,6 +42,15 @@ func (s *ShortenService) GetOriginalLink(linkID string, ctx context.Context) (st
 		return value, nil
 	} else {
 		return "", errors.New("no link with such LinkId")
+	}
+}
+
+func (s *ShortenService) GetUsersLinks(UserID string, baseURL string, ctx context.Context) (map[string]string, error) {
+	res := s.storage.FindAllUsersRecords(UserID, baseURL, ctx)
+	if len(res) != 0 {
+		return res, nil
+	} else {
+		return res, errors.New("no records with such UserID")
 	}
 }
 
