@@ -23,15 +23,23 @@ type DatabaseInstance struct {
 }
 
 func NewStorage(filename string, dsnString string) (*Storage, error) {
-	parseRes, err := pgx.ParseDSN(dsnString)
-	if err != nil {
-		log.Fatalf("Unable to parse DSN string: %v\n", err)
+	var database = DatabaseInstance{}
+	if len(dsnString) != 0 {
+		parseRes, err := pgx.ParseDSN(dsnString)
+		if err != nil {
+			log.Fatalf("Unable to parse DSN string: %v\n", err)
+		}
+		conn, err := pgx.Connect(parseRes)
+		if err != nil {
+			log.Fatalf("Unable to connection to database: %v\n", err)
+		}
+		defer conn.Close()
+		database = DatabaseInstance{
+			conn:       conn,
+			connConfig: parseRes,
+		}
 	}
-	conn, err := pgx.Connect(parseRes)
-	if err != nil {
-		log.Fatalf("Unable to connection to database: %v\n", err)
-	}
-	defer conn.Close()
+
 	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		return nil, err
@@ -41,10 +49,7 @@ func NewStorage(filename string, dsnString string) (*Storage, error) {
 		file:     file,
 		writer:   bufio.NewWriter(file),
 		fileName: filename,
-		Database: DatabaseInstance{
-			conn:       conn,
-			connConfig: parseRes,
-		},
+		Database: database,
 	}, nil
 }
 
