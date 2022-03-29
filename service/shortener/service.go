@@ -12,10 +12,10 @@ import (
 )
 
 type ShortenService struct {
-	Storage *storage.Storage
+	Storage storage.Storage
 }
 
-func NewShortenService(storage *storage.Storage) *ShortenService {
+func NewShortenService(storage storage.Storage) *ShortenService {
 	return &ShortenService{storage}
 }
 
