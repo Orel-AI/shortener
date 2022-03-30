@@ -139,6 +139,7 @@ func (h *ShortenerHandler) generateCookie() (*http.Cookie, uint64, error) {
 	return &http.Cookie{
 			Name:  h.cookieName,
 			Value: sign,
+			Path:  "/",
 		},
 		binary.BigEndian.Uint64(id),
 		nil
