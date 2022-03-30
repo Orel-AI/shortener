@@ -22,7 +22,7 @@ func main() {
 	shortenerHandler := handler.NewShortenerHandler(service, envs.BaseURL, envs.SecretString, envs.CookieName)
 	r := chi.NewRouter()
 	r.Use(shortenerHandler.GzipHandle)
-	r.Use(shortenerHandler.AuthMiddleware)
+	r.Use(shortenerHandler.AuthHandler)
 	r.Use(middleware.Logger)
 	r.Get("/{ID}", shortenerHandler.LookUpOriginalLinkGET)
 	r.Get("/api/user/urls", shortenerHandler.LookUpUsersRequest)

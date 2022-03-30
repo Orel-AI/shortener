@@ -83,7 +83,7 @@ func (h *ShortenerHandler) GzipHandle(next http.Handler) http.Handler {
 	})
 }
 
-func (h *ShortenerHandler) AuthMiddleware(next http.Handler) http.Handler {
+func (h *ShortenerHandler) AuthHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(h.cookieName)
 		if err != nil && err != http.ErrNoCookie {
@@ -116,16 +116,16 @@ func (h *ShortenerHandler) decodeCookie(cookie *http.Cookie) (uint64, error) {
 	id := binary.BigEndian.Uint64(data[:8])
 
 	hm := hmac.New(sha256.New, []byte(h.secretString))
-	hm.Write(data[:16])
+	hm.Write(data[:8])
 	sign := hm.Sum(nil)
-	if hmac.Equal(data[16:], sign) {
+	if hmac.Equal(data[8:], sign) {
 		return id, nil
 	}
 	return 0, http.ErrNoCookie
 }
 
 func (h *ShortenerHandler) generateCookie() (*http.Cookie, uint64, error) {
-	id := make([]byte, 16)
+	id := make([]byte, 8)
 
 	_, err := rand.Read(id)
 	if err != nil {
@@ -134,11 +134,11 @@ func (h *ShortenerHandler) generateCookie() (*http.Cookie, uint64, error) {
 
 	hm := hmac.New(sha256.New, []byte(h.secretString))
 	hm.Write(id)
-	val := hex.EncodeToString(append(id, hm.Sum(nil)...))
+	sign := hex.EncodeToString(append(id, hm.Sum(nil)...))
 
 	return &http.Cookie{
 			Name:  h.cookieName,
-			Value: val,
+			Value: sign,
 		},
 		binary.BigEndian.Uint64(id),
 		nil
@@ -250,10 +250,10 @@ func (h *ShortenerHandler) LookUpOriginalLinkGET(w http.ResponseWriter, r *http.
 
 func (h *ShortenerHandler) LookUpUsersRequest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userId := ctx.Value("UserID").(uint64)
-	UserID := strconv.FormatUint(userId, 10)
+	userID := ctx.Value("UserID").(uint64)
+	userIDStr := strconv.FormatUint(userID, 10)
 
-	searchResult, err := h.Shortener.GetUsersLinks(UserID, h.baseURL, ctx)
+	searchResult, err := h.Shortener.GetUsersLinks(userIDStr, h.baseURL, ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNoContent)
 		return
@@ -287,7 +287,6 @@ func (h *ShortenerHandler) PingDBByRequest(w http.ResponseWriter, r *http.Reques
 	}
 
 	w.WriteHeader(http.StatusOK)
-	return
 }
 
 func (h *ShortenerHandler) GenerateShorterLinkPOSTBatch(w http.ResponseWriter, r *http.Request) {

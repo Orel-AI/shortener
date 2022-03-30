@@ -62,12 +62,12 @@ func newDatabaseConnection(dsn string) (*DatabaseInstance, error) {
 	}, nil
 }
 
-func (s *Dict) AddRecord(key string, data string, ctx context.Context) {
-	userId := ctx.Value("UserID").(uint64)
-	userIdStr := strconv.FormatUint(userId, 10)
+func (d *Dict) AddRecord(key string, data string, ctx context.Context) {
+	userID := ctx.Value("UserID").(uint64)
+	userIDStr := strconv.FormatUint(userID, 10)
 
-	s.file.Write([]byte(key + "|" + data + "|" + userIdStr + "\n"))
-	s.file.Sync()
+	d.file.Write([]byte(key + "|" + data + "|" + userIDStr + "\n"))
+	d.file.Sync()
 }
 
 func (d *Dict) FindRecord(key string, ctx context.Context) (res string) {
@@ -99,13 +99,13 @@ func (d *Dict) FindRecordWithUserID(key string, ctx context.Context) (res string
 	}
 	defer fileToRead.Close()
 
-	userId := ctx.Value("UserID").(uint64)
-	UserID := strconv.FormatUint(userId, 10)
+	userID := ctx.Value("UserID").(uint64)
+	UserIDStr := strconv.FormatUint(userID, 10)
 
 	scanner := bufio.NewScanner(fileToRead)
 	for scanner.Scan() {
 		if strings.Contains(scanner.Text(), key) {
-			if strings.Contains(scanner.Text(), UserID) {
+			if strings.Contains(scanner.Text(), UserIDStr) {
 				line := scanner.Text()
 				line = line[strings.Index(line, "|")+1 : strings.LastIndex(line, "|")]
 				line = strings.ReplaceAll(line, "\n", "")
@@ -161,6 +161,10 @@ func (db *DatabaseInstance) PingDB(ctx context.Context) error {
 		return errors.New("there is no BD connect")
 	}
 	conn, err := db.reconnect()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	defer conn.Close(ctx)
 	return err
 }
@@ -172,7 +176,7 @@ func (db *DatabaseInstance) FindRecord(key string, ctx context.Context) (res str
 	defer conn.Close(ctx)
 	var result string
 
-	err = conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
+	_ = conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
 		"WHERE short_url  = $1;", key).Scan(&result)
 	return result
 }
@@ -184,18 +188,18 @@ func (db *DatabaseInstance) FindRecordWithUserID(key string, ctx context.Context
 	}
 	defer conn.Close(ctx)
 	var result string
-	userId := ctx.Value("UserID").(uint64)
-	userIdStr := strconv.FormatUint(userId, 10)
+	userID := ctx.Value("UserID").(uint64)
+	userIDStr := strconv.FormatUint(userID, 10)
 
 	conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
-		"WHERE short_url  = $1 and user_id = $2;", key, userIdStr).Scan(&result)
+		"WHERE short_url  = $1 and user_id = $2;", key, userIDStr).Scan(&result)
 	return result
 
 }
 
 func (db *DatabaseInstance) AddRecord(key string, data string, ctx context.Context) {
-	userId := ctx.Value("UserID").(uint64)
-	userIdStr := strconv.FormatUint(userId, 10)
+	userID := ctx.Value("UserID").(uint64)
+	userIDStr := strconv.FormatUint(userID, 10)
 
 	conn, err := db.reconnect()
 	if err != nil {
@@ -204,16 +208,15 @@ func (db *DatabaseInstance) AddRecord(key string, data string, ctx context.Conte
 	defer conn.Close(ctx)
 
 	_, err = conn.Exec(ctx, "INSERT INTO shortener.shortener "+
-		"(original_url, short_url, user_id) VALUES ($1, $2, $3);", data, key, userIdStr)
+		"(original_url, short_url, user_id) VALUES ($1, $2, $3);", data, key, userIDStr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return
 }
 
 func (db *DatabaseInstance) FindAllUsersRecords(key string, baseURL string, ctx context.Context) map[string]string {
-	userId := ctx.Value("UserID").(uint64)
-	userIdStr := strconv.FormatUint(userId, 10)
+	userID := ctx.Value("UserID").(uint64)
+	userIDStr := strconv.FormatUint(userID, 10)
 	results := make(map[string]string)
 	var originalURL string
 	var trimShorten string
@@ -224,8 +227,8 @@ func (db *DatabaseInstance) FindAllUsersRecords(key string, baseURL string, ctx 
 	}
 	defer conn.Close(ctx)
 
-	rows, err := conn.Query(ctx, "SELECT short_url, original_url "+
-		"FROM shortener.shortener WHERE user_id = $1", userIdStr)
+	rows, _ := conn.Query(ctx, "SELECT short_url, original_url "+
+		"FROM shortener.shortener WHERE user_id = $1", userIDStr)
 
 	for rows.Next() {
 		err := rows.Scan(&trimShorten, &originalURL)
