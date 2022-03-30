@@ -83,16 +83,16 @@ func (h *ShortenerHandler) GzipHandle(next http.Handler) http.Handler {
 	})
 }
 
-func (h *ShortenerHandler) AuthMiddlewareHandler(next http.Handler) http.Handler {
+func (h *ShortenerHandler) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(h.cookieName)
 		if err != nil && err != http.ErrNoCookie {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		id, err := h.decodeAuthCookie(cookie)
+		id, err := h.decodeCookie(cookie)
 		if err != nil {
-			cookie, id, err = h.generateAuthCookie()
+			cookie, id, err = h.generateCookie()
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -103,7 +103,7 @@ func (h *ShortenerHandler) AuthMiddlewareHandler(next http.Handler) http.Handler
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
-func (h *ShortenerHandler) decodeAuthCookie(cookie *http.Cookie) (uint64, error) {
+func (h *ShortenerHandler) decodeCookie(cookie *http.Cookie) (uint64, error) {
 	if cookie == nil {
 		return 0, http.ErrNoCookie
 	}
@@ -116,16 +116,16 @@ func (h *ShortenerHandler) decodeAuthCookie(cookie *http.Cookie) (uint64, error)
 	id := binary.BigEndian.Uint64(data[:8])
 
 	hm := hmac.New(sha256.New, []byte(h.secretString))
-	hm.Write(data[:8])
+	hm.Write(data[:16])
 	sign := hm.Sum(nil)
-	if hmac.Equal(data[8:], sign) {
+	if hmac.Equal(data[16:], sign) {
 		return id, nil
 	}
 	return 0, http.ErrNoCookie
 }
 
-func (h *ShortenerHandler) generateAuthCookie() (*http.Cookie, uint64, error) {
-	id := make([]byte, 8)
+func (h *ShortenerHandler) generateCookie() (*http.Cookie, uint64, error) {
+	id := make([]byte, 16)
 
 	_, err := rand.Read(id)
 	if err != nil {
@@ -134,11 +134,11 @@ func (h *ShortenerHandler) generateAuthCookie() (*http.Cookie, uint64, error) {
 
 	hm := hmac.New(sha256.New, []byte(h.secretString))
 	hm.Write(id)
-	sign := hex.EncodeToString(append(id, hm.Sum(nil)...))
+	val := hex.EncodeToString(append(id, hm.Sum(nil)...))
 
 	return &http.Cookie{
 			Name:  h.cookieName,
-			Value: sign,
+			Value: val,
 		},
 		binary.BigEndian.Uint64(id),
 		nil

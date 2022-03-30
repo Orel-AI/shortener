@@ -19,10 +19,10 @@ func main() {
 		log.Fatal(err)
 	}
 	service := shortener.NewShortenService(store)
-	shortenerHandler := handler.NewShortenerHandler(service, envs.BaseURL, "secret", "shrtCookie")
+	shortenerHandler := handler.NewShortenerHandler(service, envs.BaseURL, envs.SecretString, envs.CookieName)
 	r := chi.NewRouter()
 	r.Use(shortenerHandler.GzipHandle)
-	r.Use(shortenerHandler.AuthMiddlewareHandler)
+	r.Use(shortenerHandler.AuthMiddleware)
 	r.Use(middleware.Logger)
 	r.Get("/{ID}", shortenerHandler.LookUpOriginalLinkGET)
 	r.Get("/api/user/urls", shortenerHandler.LookUpUsersRequest)
