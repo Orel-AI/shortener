@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/Orel-AI/shortener.git/config"
 	"github.com/Orel-AI/shortener.git/service/shortener"
 	"github.com/Orel-AI/shortener.git/storage"
 	"github.com/stretchr/testify/assert"
@@ -69,7 +70,7 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 		},
 	}
 
-	store, err := storage.NewStorage("testStorage.txt", "")
+	store, err := storage.NewStorage(config.Env{FileStoragePath: "testStorage.txt"})
 	if err != nil {
 		log.Fatal(err)
 	}

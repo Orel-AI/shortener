@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"github.com/Orel-AI/shortener.git/config"
 	"log"
 	"testing"
 )
@@ -29,7 +30,7 @@ func TestFindRecord(t *testing.T) {
 			wantRes: "someData",
 		},
 	}
-	storage, err := NewStorage("testStorage.txt", "")
+	storage, err := NewStorage(config.Env{FileStoragePath: "testStorage.txt"})
 	if err != nil {
 		log.Fatal(err)
 	}
