@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Orel-AI/shortener.git/storage"
+	"log"
 	"math/big"
 	"net/url"
 )
@@ -29,6 +30,7 @@ func (s *ShortenService) GetShortLink(link string, ctx context.Context) (string,
 
 	value := s.Storage.FindRecord(encodedString, ctx)
 	if value == link {
+		log.Println("I have found short link for this url : " + value)
 		return encodedString, true, nil
 	} else {
 		s.Storage.AddRecord(encodedString, link, ctx)
