@@ -189,7 +189,7 @@ func (db *DatabaseInstance) FindRecord(key string, ctx context.Context) (res str
 
 	err = conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
 		"WHERE short_url  = $1;", key).Scan(&result)
-	if err != pgx.ErrNoRows {
+	if err != pgx.ErrNoRows && err != nil {
 		log.Fatal(err)
 	}
 	return result
