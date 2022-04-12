@@ -2,9 +2,10 @@ package storage
 
 import (
 	"bufio"
-	"context"
+	context "context"
 	"errors"
 	"fmt"
+	"github.com/Orel-AI/shortener.git/config"
 	"github.com/jackc/pgx/v4"
 	"log"
 	"os"
@@ -18,6 +19,7 @@ type Storage interface {
 	AddRecord(key string, data string, ctx context.Context)
 	FindAllUsersRecords(key string, baseURL string, ctx context.Context) map[string]string
 	FindRecordWithUserID(key string, ctx context.Context) (res string)
+	SetDeleteFlag(baseURL []string, UserId string)
 }
 type Dict struct {
 	file     *os.File
@@ -29,15 +31,15 @@ type DatabaseInstance struct {
 	connConfig string
 }
 
-func NewStorage(filename string, dsnString string) (Storage, error) {
+func NewStorage(env config.Env) (Storage, error) {
 
-	if len(dsnString) > 0 {
-		storage, _ := newDatabaseConnection(dsnString)
+	if len(env.DSNString) > 0 {
+		storage, _ := newDatabaseConnection(env.DSNString)
 		storage.checkExist()
 		return storage, nil
 	}
 
-	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
+	file, err := os.OpenFile(env.FileStoragePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0777)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +47,7 @@ func NewStorage(filename string, dsnString string) (Storage, error) {
 	return &Dict{
 		file:     file,
 		writer:   bufio.NewWriter(file),
-		fileName: filename,
+		fileName: env.FileStoragePath,
 	}, nil
 }
 
@@ -175,9 +177,21 @@ func (db *DatabaseInstance) FindRecord(key string, ctx context.Context) (res str
 	}
 	defer conn.Close(ctx)
 	var result string
+	var count int
+	err = conn.QueryRow(ctx, "SELECT count(original_url) FROM shortener.shortener "+
+		"WHERE short_url  = $1 and deleted = '1'", key).Scan(&count)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if count == 1 {
+		return "deleted"
+	}
 
-	_ = conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
+	err = conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
 		"WHERE short_url  = $1;", key).Scan(&result)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return result
 }
 
@@ -191,8 +205,11 @@ func (db *DatabaseInstance) FindRecordWithUserID(key string, ctx context.Context
 	userID := ctx.Value("UserID").(uint64)
 	userIDStr := strconv.FormatUint(userID, 10)
 
-	conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
+	err = conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
 		"WHERE short_url  = $1 and user_id = $2;", key, userIDStr).Scan(&result)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return result
 
 }
@@ -254,9 +271,27 @@ func (db *DatabaseInstance) checkExist() {
 	err = conn.QueryRow(context.Background(), "SELECT COUNT(*) FROM shortener.shortener;").Scan(&cnt)
 	if err != nil {
 		_, err = conn.Exec(context.Background(), "CREATE TABLE shortener.shortener (user_id VARCHAR(256),"+
-			" short_url VARCHAR(256), original_url VARCHAR(256) PRIMARY KEY );")
+			" short_url VARCHAR(256), original_url VARCHAR(256) PRIMARY KEY, DELETED VARCHAR(1) );")
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
+}
+
+func (db *DatabaseInstance) SetDeleteFlag(baseURLs []string, userID string) {
+
+	conn, err := db.reconnect()
+	if err != nil {
+		log.Fatal(err)
+	}
+	ctx := context.Background()
+
+	_, err = conn.Exec(ctx, "UPDATE shortener.shortener set deleted = '1'"+
+		" where short_url = ANY($1) and user_id = $2;", baseURLs, userID)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (d *Dict) SetDeleteFlag(baseURLs []string, UserId string) {
 }

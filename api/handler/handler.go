@@ -39,12 +39,12 @@ type MapOriginalShorten struct {
 	ShortURL    string `json:"short_url"`
 }
 
-type BatchRq struct {
+type BatchRequest struct {
 	CorrelationID string `json:"correlation_id"`
 	OriginalURL   string `json:"original_url"`
 }
 
-type BatchRs struct {
+type BatchResponse struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
 }
@@ -57,7 +57,7 @@ type gzipWriter struct {
 func (w gzipWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
 }
-func (h *ShortenerHandler) GzipHandle(next http.Handler) http.Handler {
+func GzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 			gzippedOutput, err := gzip.NewReader(r.Body)
@@ -83,7 +83,7 @@ func (h *ShortenerHandler) GzipHandle(next http.Handler) http.Handler {
 	})
 }
 
-func (h *ShortenerHandler) AuthHandler(next http.Handler) http.Handler {
+func (h *ShortenerHandler) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(h.cookieName)
 		if err != nil && err != http.ErrNoCookie {
@@ -245,6 +245,10 @@ func (h *ShortenerHandler) LookUpOriginalLinkGET(w http.ResponseWriter, r *http.
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if originalLink == "deleted" {
+		w.WriteHeader(http.StatusGone)
+		return
+	}
 	w.Header().Add("Location", originalLink)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
@@ -304,8 +308,8 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTBatch(w http.ResponseWriter, r
 		return
 	}
 
-	var reqBody []BatchRq
-	var resBody []BatchRs
+	var reqBody []BatchRequest
+	var resBody []BatchResponse
 
 	err = json.Unmarshal(body, &reqBody)
 	if err != nil {
@@ -318,7 +322,7 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTBatch(w http.ResponseWriter, r
 			continue
 		}
 		result = fmt.Sprintf("%v/%v", h.baseURL, result)
-		resBody = append(resBody, BatchRs{
+		resBody = append(resBody, BatchResponse{
 			CorrelationID: reqBody[i].CorrelationID,
 			ShortURL:      result,
 		})
@@ -336,4 +340,31 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTBatch(w http.ResponseWriter, r
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+}
+
+func (h *ShortenerHandler) BatchDeleteLinks(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	body, err := io.ReadAll(r.Body)
+	defer r.Body.Close()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	bodyStr := string(body)
+	bodyStr = strings.ReplaceAll(bodyStr, "[", "")
+	bodyStr = strings.ReplaceAll(bodyStr, "]", "")
+	bodyStr = strings.ReplaceAll(bodyStr, "\"", "")
+	linksToDelete := strings.Split(bodyStr, ",")
+	for _, link := range linksToDelete {
+		log.Println(link)
+	}
+	userID := ctx.Value("UserID").(uint64)
+	userIDStr := strconv.FormatUint(userID, 10)
+	go func() {
+		h.Shortener.Storage.SetDeleteFlag(linksToDelete, userIDStr)
+	}()
+	log.Println(linksToDelete)
+
+	w.WriteHeader(http.StatusAccepted)
 }

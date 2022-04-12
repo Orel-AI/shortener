@@ -40,18 +40,18 @@ func (s *ShortenService) GetOriginalLink(linkID string, ctx context.Context) (st
 	value := s.Storage.FindRecord(linkID, ctx)
 	if value != "" {
 		return value, nil
-	} else {
-		return "", errors.New("no link with such LinkId")
 	}
+
+	return "", errors.New("no link with such LinkId")
 }
 
 func (s *ShortenService) GetUsersLinks(UserID string, baseURL string, ctx context.Context) (map[string]string, error) {
 	res := s.Storage.FindAllUsersRecords(UserID, baseURL, ctx)
 	if len(res) != 0 {
 		return res, nil
-	} else {
-		return res, errors.New("no records with such UserID")
 	}
+
+	return res, errors.New("no records with such UserID")
 }
 
 func sha256Of(input string, ctx context.Context) []byte {
