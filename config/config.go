@@ -43,5 +43,10 @@ func NewConfig() Env {
 	if len(envs.CookieName) == 0 {
 		envs.CookieName = "ShortnerCookie"
 	}
+
+	if len(envs.DSNString) == 0 {
+		envs.DSNString = "user=postgres password=admin host=localhost port=5432 dbname=postgres sslmode=disable"
+	}
+
 	return envs
 }

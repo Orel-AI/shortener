@@ -81,7 +81,8 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request, err := http.NewRequest(tt.method, tt.target, strings.NewReader(tt.want.requestLink))
-			ctx := context.WithValue(context.Background(), "UserID", uint64(123123123))
+			ctx := context.WithValue(context.Background(), keyPrincipalID, uint64(123123123))
+
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -110,7 +111,7 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 
 				request.Header.Add("Content-Type", "application/json")
 
-				shortenerHandler.GenerateShorterLinkPOSTJson(response, request)
+				shortenerHandler.GenerateShorterLinkPOSTJson(response, request.WithContext(ctx))
 
 				body, err := io.ReadAll(response.Body)
 				if err != nil {
@@ -136,7 +137,8 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 				assert.Equal(t, tt.want.responseLink, string(body))
 			}
 			if tt.method == http.MethodGet {
-				store.AddRecord(strings.TrimPrefix(request.URL.Path, "/"), tt.want.responseLink, ctx)
+
+				store.AddRecord(strings.TrimPrefix(request.URL.Path, "/"), tt.want.responseLink, "123", ctx)
 				shortenerHandler.LookUpOriginalLinkGET(response, request.WithContext(ctx))
 				result := response.Result()
 				defer result.Body.Close()

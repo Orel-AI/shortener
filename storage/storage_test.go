@@ -12,7 +12,7 @@ func TestFindRecord(t *testing.T) {
 		key    string
 		data   string
 		ctx    context.Context
-		userID int
+		userID string
 	}
 	tests := []struct {
 		name    string
@@ -25,7 +25,7 @@ func TestFindRecord(t *testing.T) {
 				key:    "someKey",
 				data:   "someData",
 				ctx:    context.Background(),
-				userID: 123124123,
+				userID: "123124123",
 			},
 			wantRes: "someData",
 		},
@@ -36,9 +36,7 @@ func TestFindRecord(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			j := uint64(tt.args.userID)
-			tt.args.ctx = context.WithValue(tt.args.ctx, "UserID", j)
-			storage.AddRecord(tt.args.key, tt.args.data, tt.args.ctx)
+			storage.AddRecord(tt.args.key, tt.args.data, tt.args.userID, tt.args.ctx)
 			if gotRes := storage.FindRecord(tt.args.key, tt.args.ctx); gotRes != tt.wantRes {
 				t.Errorf("FindRecord() = %v, want %v", gotRes, tt.wantRes)
 			}

@@ -20,7 +20,7 @@ func NewShortenService(storage storage.Storage) *ShortenService {
 	return &ShortenService{storage}
 }
 
-func (s *ShortenService) GetShortLink(link string, ctx context.Context) (string, bool, error) {
+func (s *ShortenService) GetShortLink(link string, userID string, ctx context.Context) (string, bool, error) {
 	_, err := url.ParseRequestURI(link)
 	if err != nil {
 		return "", false, errors.New(link + " is not correct URL")
@@ -33,7 +33,7 @@ func (s *ShortenService) GetShortLink(link string, ctx context.Context) (string,
 		log.Println("I have found short link for this url : " + value)
 		return encodedString, true, nil
 	} else {
-		s.Storage.AddRecord(encodedString, link, ctx)
+		s.Storage.AddRecord(encodedString, link, userID, ctx)
 		return encodedString, false, nil
 	}
 }
