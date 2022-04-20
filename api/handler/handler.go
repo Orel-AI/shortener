@@ -147,8 +147,10 @@ func (h *ShortenerHandler) generateCookie() (*http.Cookie, uint64, error) {
 	sign := hex.EncodeToString(append(id, hm.Sum(nil)...))
 
 	return &http.Cookie{
-			Name:  h.cookieName,
-			Value: sign,
+			Name:   h.cookieName,
+			Value:  sign,
+			Path:   "/",
+			Secure: false,
 		},
 		binary.BigEndian.Uint64(id),
 		nil
