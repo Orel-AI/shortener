@@ -35,8 +35,8 @@ type ResponseBody struct {
 }
 
 type MapOriginalShorten struct {
-	OriginalURL string `json:"original_url"`
 	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
 }
 
 type BatchRequest struct {
@@ -91,6 +91,9 @@ func GzipMiddleware(next http.Handler) http.Handler {
 
 func (h *ShortenerHandler) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for _, cookie := range r.Cookies() {
+			fmt.Println("Found a cookie named:", cookie.Name, " ", " ", cookie.Value)
+		}
 		cookie, err := r.Cookie(h.cookieName)
 		if err != nil && err != http.ErrNoCookie {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -146,7 +149,6 @@ func (h *ShortenerHandler) generateCookie() (*http.Cookie, uint64, error) {
 	return &http.Cookie{
 			Name:  h.cookieName,
 			Value: sign,
-			Path:  "/",
 		},
 		binary.BigEndian.Uint64(id),
 		nil
@@ -285,7 +287,7 @@ func (h *ShortenerHandler) LookUpUsersRequest(w http.ResponseWriter, r *http.Req
 	var response []MapOriginalShorten
 	for key, value := range searchResult {
 		response = append(response,
-			MapOriginalShorten{OriginalURL: key, ShortURL: value})
+			MapOriginalShorten{ShortURL: value, OriginalURL: key})
 	}
 
 	resJSON, err := json.Marshal(response)
