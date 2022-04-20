@@ -105,7 +105,7 @@ func (h *ShortenerHandler) AuthMiddleware(next http.Handler) http.Handler {
 			}
 			http.SetCookie(w, cookie)
 		}
-
+		log.Println(id)
 		ctx := context.WithValue(r.Context(), keyPrincipalID, id)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
