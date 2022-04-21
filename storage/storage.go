@@ -14,7 +14,7 @@ import (
 
 type Storage interface {
 	PingDB(ctx context.Context) error
-	FindRecord(key string, ctx context.Context) (res string)
+	FindRecord(key string, ctx context.Context) (res string, err error)
 	AddRecord(key string, data string, userID string, ctx context.Context)
 	FindAllUsersRecords(key string, baseURL string, ctx context.Context) map[string]string
 	FindRecordWithUserID(key string, userID string, ctx context.Context) (res string)
@@ -30,10 +30,17 @@ type DatabaseInstance struct {
 	connConfig string
 }
 
+var (
+	RecordIsDeleted = errors.New("record is deleted")
+)
+
 func NewStorage(env config.Env) (Storage, error) {
 
 	if len(env.DSNString) > 0 {
-		storage, _ := newDatabaseConnection(env.DSNString)
+		storage, err := newDatabaseConnection(env.DSNString)
+		if err != nil {
+			log.Fatal(err)
+		}
 		storage.checkExist()
 		return storage, nil
 	}
@@ -69,7 +76,7 @@ func (d *Dict) AddRecord(key string, data string, userID string, ctx context.Con
 	d.file.Sync()
 }
 
-func (d *Dict) FindRecord(key string, ctx context.Context) (res string) {
+func (d *Dict) FindRecord(key string, ctx context.Context) (res string, err error) {
 	fileToRead, err := os.OpenFile(d.fileName, os.O_RDONLY, 0777)
 	if err != nil {
 		log.Fatal(err)
@@ -82,13 +89,13 @@ func (d *Dict) FindRecord(key string, ctx context.Context) (res string) {
 			line := scanner.Text()
 			line = line[strings.Index(line, "|")+1 : strings.LastIndex(line, "|")]
 			line = strings.ReplaceAll(line, "\n", "")
-			return line
+			return line, nil
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
-	return ""
+	return "", nil
 }
 
 func (d *Dict) FindRecordWithUserID(key string, userID string, ctx context.Context) (res string) {
@@ -164,7 +171,7 @@ func (db *DatabaseInstance) PingDB(ctx context.Context) error {
 	defer conn.Close(ctx)
 	return err
 }
-func (db *DatabaseInstance) FindRecord(key string, ctx context.Context) (res string) {
+func (db *DatabaseInstance) FindRecord(key string, ctx context.Context) (res string, err error) {
 	conn, err := db.reconnect()
 	if err != nil {
 		log.Fatal(err)
@@ -175,10 +182,11 @@ func (db *DatabaseInstance) FindRecord(key string, ctx context.Context) (res str
 	err = conn.QueryRow(ctx, "SELECT count(original_url) FROM shortener.shortener "+
 		"WHERE short_url  = $1 and deleted = '1'", key).Scan(&count)
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 	if count == 1 {
-		return "deleted"
+		err := RecordIsDeleted
+		return "", err
 	}
 
 	err = conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
@@ -186,7 +194,7 @@ func (db *DatabaseInstance) FindRecord(key string, ctx context.Context) (res str
 	if err != pgx.ErrNoRows && err != nil {
 		log.Fatal(err)
 	}
-	return result
+	return result, nil
 }
 
 func (db *DatabaseInstance) FindRecordWithUserID(key string, userID string, ctx context.Context) (res string) {

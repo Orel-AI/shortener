@@ -37,7 +37,10 @@ func TestFindRecord(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			storage.AddRecord(tt.args.key, tt.args.data, tt.args.userID, tt.args.ctx)
-			if gotRes := storage.FindRecord(tt.args.key, tt.args.ctx); gotRes != tt.wantRes {
+			if gotRes, err := storage.FindRecord(tt.args.key, tt.args.ctx); gotRes != tt.wantRes {
+				if err != nil {
+					log.Fatal(err)
+				}
 				t.Errorf("FindRecord() = %v, want %v", gotRes, tt.wantRes)
 			}
 		})

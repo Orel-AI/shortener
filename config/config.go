@@ -20,7 +20,7 @@ func NewConfig() Env {
 	filePath := flag.String("f", os.Getenv("FILE_STORAGE_PATH"), "path for storage file")
 	dsnString := flag.String("d", os.Getenv("DATABASE_DSN"), "dsn to connect PostgreSQL")
 	secretString := flag.String("s", os.Getenv("SECRET_STRING"), "String to make cookie")
-	cookieName := flag.String("c", os.Getenv("DATABASE_DSN"), "Name cookie have")
+	cookieName := flag.String("c", os.Getenv("COOKIE_NAME"), "Name cookie have")
 	flag.Parse()
 	envs := Env{*address, *baseURL, *filePath,
 		*dsnString, *secretString, *cookieName}

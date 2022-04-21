@@ -9,8 +9,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/Orel-AI/shortener.git/service/shortener"
+	"github.com/Orel-AI/shortener.git/storage"
 	"github.com/go-chi/chi/v5"
 	"io"
 	"log"
@@ -250,9 +252,6 @@ func (h *ShortenerHandler) LookUpOriginalLinkGET(w http.ResponseWriter, r *http.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	//userID := ctx.Value(keyPrincipalID).(uint64)
-	//userIDStr := strconv.FormatUint(userID, 10)
-
 	ID := chi.URLParam(r, "ID")
 	if ID == "" && strings.TrimPrefix(r.URL.Path, "/") == "" {
 		http.Error(w, "ID of link is missed", http.StatusBadRequest)
@@ -261,11 +260,11 @@ func (h *ShortenerHandler) LookUpOriginalLinkGET(w http.ResponseWriter, r *http.
 		ID = strings.TrimPrefix(r.URL.Path, "/")
 	}
 	originalLink, err := h.Shortener.GetOriginalLink(ID, ctx)
-	if err != nil {
+	if err != nil && !errors.Is(err, storage.RecordIsDeleted) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if originalLink == "deleted" {
+	if errors.Is(err, storage.RecordIsDeleted) {
 		w.WriteHeader(http.StatusGone)
 		return
 	}
@@ -377,19 +376,16 @@ func (h *ShortenerHandler) BatchDeleteLinks(w http.ResponseWriter, r *http.Reque
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	bodyStr := string(body)
-	bodyStr = strings.ReplaceAll(bodyStr, "[", "")
-	bodyStr = strings.ReplaceAll(bodyStr, "]", "")
-	bodyStr = strings.ReplaceAll(bodyStr, "\"", "")
-	linksToDelete := strings.Split(bodyStr, ",")
-	for _, link := range linksToDelete {
-		log.Println(link)
+	var urlIDs []string
+	err = json.Unmarshal(body, &urlIDs)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	go func() {
-		h.Shortener.Storage.SetDeleteFlag(linksToDelete, userIDStr)
+		h.Shortener.Storage.SetDeleteFlag(urlIDs, userIDStr)
 	}()
-	log.Println(linksToDelete)
 
 	w.WriteHeader(http.StatusAccepted)
 }

@@ -28,7 +28,10 @@ func (s *ShortenService) GetShortLink(link string, userID string, ctx context.Co
 
 	encodedString := GenerateShortLink(link, ctx)
 
-	value := s.Storage.FindRecord(encodedString, ctx)
+	value, err := s.Storage.FindRecord(encodedString, ctx)
+	if !errors.Is(err, storage.RecordIsDeleted) && err != nil {
+		log.Fatal(err)
+	}
 	if value == link {
 		log.Println("I have found short link for this url : " + value)
 		return encodedString, true, nil
@@ -39,7 +42,10 @@ func (s *ShortenService) GetShortLink(link string, userID string, ctx context.Co
 }
 
 func (s *ShortenService) GetOriginalLink(linkID string, ctx context.Context) (string, error) {
-	value := s.Storage.FindRecord(linkID, ctx)
+	value, err := s.Storage.FindRecord(linkID, ctx)
+	if err != nil {
+		return "", err
+	}
 	if value != "" {
 		return value, nil
 	}
