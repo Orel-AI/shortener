@@ -91,10 +91,8 @@ func GzipMiddleware(next http.Handler) http.Handler {
 
 func (h *ShortenerHandler) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		for _, cookie := range r.Cookies() {
-			fmt.Println("Found a cookie named:", cookie.Name, " ", " ", cookie.Value)
-		}
 		cookie, err := r.Cookie(h.cookieName)
+		log.Println("Cookie found by name: ", cookie)
 		if err != nil && err != http.ErrNoCookie {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -108,7 +106,7 @@ func (h *ShortenerHandler) AuthMiddleware(next http.Handler) http.Handler {
 			}
 			http.SetCookie(w, cookie)
 		}
-		log.Println(id)
+		log.Println("UserID: ", id)
 		ctx := context.WithValue(r.Context(), keyPrincipalID, id)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
