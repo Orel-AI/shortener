@@ -3,10 +3,12 @@ package storage
 import (
 	"bufio"
 	context "context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"github.com/Orel-AI/shortener.git/config"
 	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"log"
 	"os"
 	"strings"
@@ -18,7 +20,7 @@ type Storage interface {
 	AddRecord(key string, data string, userID string, ctx context.Context)
 	FindAllUsersRecords(key string, baseURL string, ctx context.Context) map[string]string
 	FindRecordWithUserID(key string, userID string, ctx context.Context) (res string)
-	SetDeleteFlag(baseURL []string, userID string)
+	SetDeleteFlag(baseURL string, userID string)
 }
 type Dict struct {
 	file     *os.File
@@ -26,12 +28,13 @@ type Dict struct {
 	fileName string
 }
 type DatabaseInstance struct {
-	conn       *pgx.Conn
+	conn       *pgxpool.Pool
 	connConfig string
+	db         *sql.DB
 }
 
 var (
-	RecordIsDeleted = errors.New("record is deleted")
+	ErrRecordIsDeleted = errors.New("record is deleted")
 )
 
 func NewStorage(env config.Env) (Storage, error) {
@@ -58,11 +61,13 @@ func NewStorage(env config.Env) (Storage, error) {
 }
 
 func newDatabaseConnection(dsn string) (*DatabaseInstance, error) {
-	conn, err := pgx.Connect(context.Background(), dsn)
+	conn, err := pgxpool.Connect(context.Background(), dsn)
+	//conn, err := pgx.Connect(context.Background(), dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close(context.Background())
+
+	//defer conn.Close(context.Background())
 	log.Println("DB Connected!")
 	return &DatabaseInstance{
 		conn:       conn,
@@ -160,36 +165,28 @@ func (db *DatabaseInstance) reconnect() (*pgx.Conn, error) {
 }
 
 func (db *DatabaseInstance) PingDB(ctx context.Context) error {
-	if db.connConfig == "" {
-		return errors.New("there is no BD connect")
-	}
-	conn, err := db.reconnect()
+	err := db.conn.Ping(ctx)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-
-	defer conn.Close(ctx)
-	return err
+	return nil
 }
+
 func (db *DatabaseInstance) FindRecord(key string, ctx context.Context) (res string, err error) {
-	conn, err := db.reconnect()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close(ctx)
+
 	var result string
 	var count int
-	err = conn.QueryRow(ctx, "SELECT count(original_url) FROM shortener.shortener "+
+	err = db.conn.QueryRow(ctx, "SELECT count(original_url) FROM shortener.shortener "+
 		"WHERE short_url  = $1 and deleted = '1'", key).Scan(&count)
 	if err != nil {
 		return "", err
 	}
 	if count == 1 {
-		err := RecordIsDeleted
+		err := ErrRecordIsDeleted
 		return "", err
 	}
 
-	err = conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
+	err = db.conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
 		"WHERE short_url  = $1;", key).Scan(&result)
 	if err != pgx.ErrNoRows && err != nil {
 		log.Fatal(err)
@@ -198,14 +195,10 @@ func (db *DatabaseInstance) FindRecord(key string, ctx context.Context) (res str
 }
 
 func (db *DatabaseInstance) FindRecordWithUserID(key string, userID string, ctx context.Context) (res string) {
-	conn, err := db.reconnect()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close(ctx)
+
 	var result string
 
-	err = conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
+	err := db.conn.QueryRow(ctx, "SELECT original_url FROM shortener.shortener "+
 		"WHERE short_url  = $1 and user_id = $2;", key, userID).Scan(&result)
 	if err != nil {
 		log.Fatal(err)
@@ -215,14 +208,7 @@ func (db *DatabaseInstance) FindRecordWithUserID(key string, userID string, ctx 
 }
 
 func (db *DatabaseInstance) AddRecord(key string, data string, userID string, ctx context.Context) {
-
-	conn, err := db.reconnect()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close(ctx)
-
-	_, err = conn.Exec(ctx, "INSERT INTO shortener.shortener "+
+	_, err := db.conn.Exec(ctx, "INSERT INTO shortener.shortener "+
 		"(original_url, short_url, user_id) VALUES ($1, $2, $3);", data, key, userID)
 	if err != nil {
 		log.Fatal(err)
@@ -235,13 +221,7 @@ func (db *DatabaseInstance) FindAllUsersRecords(key string, baseURL string, ctx 
 	var originalURL string
 	var trimShorten string
 
-	conn, err := db.reconnect()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer conn.Close(ctx)
-
-	rows, _ := conn.Query(ctx, "SELECT short_url, original_url "+
+	rows, _ := db.conn.Query(ctx, "SELECT short_url, original_url "+
 		"FROM shortener.shortener WHERE user_id = $1", key)
 
 	for rows.Next() {
@@ -255,19 +235,15 @@ func (db *DatabaseInstance) FindAllUsersRecords(key string, baseURL string, ctx 
 }
 
 func (db *DatabaseInstance) checkExist() {
-	conn, err := db.reconnect()
-	if err != nil {
-		log.Fatal(err)
-	}
 	var cnt int
-	defer conn.Close(context.Background())
-	_, err = conn.Exec(context.Background(), "CREATE SCHEMA IF NOT EXISTS shortener AUTHORIZATION postgres;")
+
+	_, err := db.conn.Exec(context.Background(), "CREATE SCHEMA IF NOT EXISTS shortener AUTHORIZATION postgres;")
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = conn.QueryRow(context.Background(), "SELECT COUNT(*) FROM shortener.shortener;").Scan(&cnt)
+	err = db.conn.QueryRow(context.Background(), "SELECT COUNT(*) FROM shortener.shortener;").Scan(&cnt)
 	if err != nil {
-		_, err = conn.Exec(context.Background(), "CREATE TABLE shortener.shortener (user_id VARCHAR(256),"+
+		_, err = db.conn.Exec(context.Background(), "CREATE TABLE shortener.shortener (user_id VARCHAR(256),"+
 			" short_url VARCHAR(256), original_url VARCHAR(256) PRIMARY KEY, DELETED VARCHAR(1) );")
 		if err != nil {
 			log.Fatal(err)
@@ -275,20 +251,16 @@ func (db *DatabaseInstance) checkExist() {
 	}
 }
 
-func (db *DatabaseInstance) SetDeleteFlag(baseURLs []string, userID string) {
+func (db *DatabaseInstance) SetDeleteFlag(baseURL string, userID string) {
 
-	conn, err := db.reconnect()
-	if err != nil {
-		log.Fatal(err)
-	}
 	ctx := context.Background()
 
-	_, err = conn.Exec(ctx, "UPDATE shortener.shortener set deleted = '1'"+
-		" where short_url = ANY($1) and user_id = $2;", baseURLs, userID)
+	_, err := db.conn.Exec(ctx, "UPDATE shortener.shortener set deleted = '1'"+
+		" where short_url = $1 and user_id = $2;", baseURL, userID)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func (d *Dict) SetDeleteFlag(baseURLs []string, userID string) {
+func (d *Dict) SetDeleteFlag(baseURL string, userID string) {
 }

@@ -163,7 +163,11 @@ func NewShortenerHandler(s *shortener.ShortenService, b string, secretString str
 func (h *ShortenerHandler) GenerateShorterLinkPOSTJson(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID := ctx.Value(keyPrincipalID).(uint64)
+	userID, ok := ctx.Value(keyPrincipalID).(uint64)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	userIDStr := strconv.FormatUint(userID, 10)
 
 	body, err := io.ReadAll(r.Body)
@@ -215,7 +219,11 @@ func (h *ShortenerHandler) GenerateShorterLinkPOST(w http.ResponseWriter, r *htt
 
 	ctx := r.Context()
 
-	userID := ctx.Value(keyPrincipalID).(uint64)
+	userID, ok := ctx.Value(keyPrincipalID).(uint64)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	userIDStr := strconv.FormatUint(userID, 10)
 
 	body, err := io.ReadAll(r.Body)
@@ -260,11 +268,11 @@ func (h *ShortenerHandler) LookUpOriginalLinkGET(w http.ResponseWriter, r *http.
 		ID = strings.TrimPrefix(r.URL.Path, "/")
 	}
 	originalLink, err := h.Shortener.GetOriginalLink(ID, ctx)
-	if err != nil && !errors.Is(err, storage.RecordIsDeleted) {
+	if err != nil && !errors.Is(err, storage.ErrRecordIsDeleted) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if errors.Is(err, storage.RecordIsDeleted) {
+	if errors.Is(err, storage.ErrRecordIsDeleted) {
 		w.WriteHeader(http.StatusGone)
 		return
 	}
@@ -274,7 +282,11 @@ func (h *ShortenerHandler) LookUpOriginalLinkGET(w http.ResponseWriter, r *http.
 
 func (h *ShortenerHandler) LookUpUsersRequest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID := ctx.Value(keyPrincipalID).(uint64)
+	userID, ok := ctx.Value(keyPrincipalID).(uint64)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	userIDStr := strconv.FormatUint(userID, 10)
 
 	searchResult, err := h.Shortener.GetUsersLinks(userIDStr, h.baseURL, ctx)
@@ -316,7 +328,11 @@ func (h *ShortenerHandler) PingDBByRequest(w http.ResponseWriter, r *http.Reques
 func (h *ShortenerHandler) GenerateShorterLinkPOSTBatch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID := ctx.Value(keyPrincipalID).(uint64)
+	userID, ok := ctx.Value(keyPrincipalID).(uint64)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	userIDStr := strconv.FormatUint(userID, 10)
 
 	body, err := io.ReadAll(r.Body)
@@ -367,7 +383,11 @@ func (h *ShortenerHandler) GenerateShorterLinkPOSTBatch(w http.ResponseWriter, r
 func (h *ShortenerHandler) BatchDeleteLinks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID := ctx.Value(keyPrincipalID).(uint64)
+	userID, ok := ctx.Value(keyPrincipalID).(uint64)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	userIDStr := strconv.FormatUint(userID, 10)
 
 	body, err := io.ReadAll(r.Body)
@@ -383,9 +403,7 @@ func (h *ShortenerHandler) BatchDeleteLinks(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	go func() {
-		h.Shortener.Storage.SetDeleteFlag(urlIDs, userIDStr)
-	}()
+	h.Shortener.ChangeFlagToDeleteWorkPool(urlIDs, userIDStr)
 
 	w.WriteHeader(http.StatusAccepted)
 }

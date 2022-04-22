@@ -16,6 +16,11 @@ type ShortenService struct {
 	Storage storage.Storage
 }
 
+type Job struct {
+	BaseURL string
+	UserID  string
+}
+
 func NewShortenService(storage storage.Storage) *ShortenService {
 	return &ShortenService{storage}
 }
@@ -29,7 +34,7 @@ func (s *ShortenService) GetShortLink(link string, userID string, ctx context.Co
 	encodedString := GenerateShortLink(link, ctx)
 
 	value, err := s.Storage.FindRecord(encodedString, ctx)
-	if !errors.Is(err, storage.RecordIsDeleted) && err != nil {
+	if !errors.Is(err, storage.ErrRecordIsDeleted) && err != nil {
 		log.Fatal(err)
 	}
 	if value == link {
@@ -73,4 +78,22 @@ func GenerateShortLink(initialLink string, ctx context.Context) string {
 	generatedNumber := new(big.Int).SetBytes(urlHashBytes).Uint64()
 	finalString := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%d", generatedNumber)))
 	return finalString[:8]
+}
+
+func (s *ShortenService) ChangeFlagToDeleteWorkPool(urlIDs []string, userID string) {
+
+	jobCh := make(chan *Job)
+
+	for i := 1; i <= len(urlIDs); i++ {
+		go func() {
+			for job := range jobCh {
+				s.Storage.SetDeleteFlag(job.BaseURL, job.UserID)
+			}
+		}()
+	}
+
+	for _, element := range urlIDs {
+		job := &Job{BaseURL: element, UserID: userID}
+		jobCh <- job
+	}
 }
