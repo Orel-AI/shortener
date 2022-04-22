@@ -2,15 +2,17 @@ package storage
 
 import (
 	"context"
+	"github.com/Orel-AI/shortener.git/config"
 	"log"
 	"testing"
 )
 
 func TestFindRecord(t *testing.T) {
 	type args struct {
-		key  string
-		data string
-		ctx  context.Context
+		key    string
+		data   string
+		ctx    context.Context
+		userID string
 	}
 	tests := []struct {
 		name    string
@@ -20,21 +22,25 @@ func TestFindRecord(t *testing.T) {
 		{
 			name: "Success test",
 			args: args{
-				key:  "someKey",
-				data: "someData",
-				ctx:  context.Background(),
+				key:    "someKey",
+				data:   "someData",
+				ctx:    context.Background(),
+				userID: "123124123",
 			},
 			wantRes: "someData",
 		},
 	}
-	storage, err := NewStorage("testStorage.txt")
+	storage, err := NewStorage(config.Env{FileStoragePath: "testStorage.txt"})
 	if err != nil {
 		log.Fatal(err)
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storage.AddRecord(tt.args.key, tt.args.data, tt.args.ctx)
-			if gotRes := storage.FindRecord(tt.args.key, tt.args.ctx); gotRes != tt.wantRes {
+			storage.AddRecord(tt.args.key, tt.args.data, tt.args.userID, tt.args.ctx)
+			if gotRes, err := storage.FindRecord(tt.args.key, tt.args.ctx); gotRes != tt.wantRes {
+				if err != nil {
+					log.Fatal(err)
+				}
 				t.Errorf("FindRecord() = %v, want %v", gotRes, tt.wantRes)
 			}
 		})

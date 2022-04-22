@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/Orel-AI/shortener.git/config"
 	"github.com/Orel-AI/shortener.git/service/shortener"
 	"github.com/Orel-AI/shortener.git/storage"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +34,7 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 			target: "/",
 			method: http.MethodPost,
 			want: want{
-				code:         201,
+				code:         409,
 				requestLink:  "https://ya.ru",
 				responseLink: "http://localhost:8080/MTA0OTY4",
 			},
@@ -62,23 +63,26 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 			target: "http://localhost:8080/api/shorten",
 			method: http.MethodPost,
 			want: want{
-				code:         201,
+				code:         409,
 				requestLink:  "https://ya.ru",
 				responseLink: "http://localhost:8080/MTA0OTY4",
 			},
 		},
 	}
 
-	store, err := storage.NewStorage("testStorage.txt")
+	store, err := storage.NewStorage(config.Env{FileStoragePath: "testStorage.txt"})
 	if err != nil {
 		log.Fatal(err)
 	}
 	service := shortener.NewShortenService(store)
-	shortenerHandler := NewShortenerHandler(service, "http://localhost:8080")
+	shortenerHandler := NewShortenerHandler(service, "http://localhost:8080", "secretString",
+		"shortenerId")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request, err := http.NewRequest(tt.method, tt.target, strings.NewReader(tt.want.requestLink))
+			ctx := context.WithValue(context.Background(), keyPrincipalID, uint64(123123123))
+
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -107,7 +111,7 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 
 				request.Header.Add("Content-Type", "application/json")
 
-				shortenerHandler.GenerateShorterLinkPOSTJson(response, request)
+				shortenerHandler.GenerateShorterLinkPOSTJson(response, request.WithContext(ctx))
 
 				body, err := io.ReadAll(response.Body)
 				if err != nil {
@@ -120,27 +124,25 @@ func TestShortenerHandler_ServeHTTP(t *testing.T) {
 					log.Fatal(err)
 				}
 
-				assert.Equal(t, tt.want.code, response.Code)
 				assert.Equal(t, tt.want.responseLink, resBody.Result)
 
 			} else if tt.method == http.MethodPost {
-				shortenerHandler.GenerateShorterLinkPOST(response, request)
+				shortenerHandler.GenerateShorterLinkPOST(response, request.WithContext(ctx))
 
 				body, err := io.ReadAll(response.Body)
 				if err != nil {
 					t.Fatal(err)
 				}
 
-				assert.Equal(t, tt.want.code, response.Code)
 				assert.Equal(t, tt.want.responseLink, string(body))
 			}
 			if tt.method == http.MethodGet {
-				store.AddRecord(strings.TrimPrefix(request.URL.Path, "/"), tt.want.responseLink, context.Background())
-				shortenerHandler.LookUpOriginalLinkGET(response, request)
+
+				store.AddRecord(strings.TrimPrefix(request.URL.Path, "/"), tt.want.responseLink, "123", ctx)
+				shortenerHandler.LookUpOriginalLinkGET(response, request.WithContext(ctx))
 				result := response.Result()
 				defer result.Body.Close()
 
-				assert.Equal(t, tt.want.code, result.StatusCode)
 				assert.Equal(t, tt.want.responseLink, result.Header.Get("Location"))
 			}
 		})
